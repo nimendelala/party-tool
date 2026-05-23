@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>体育系党支部工具箱</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -297,7 +296,7 @@
     <button class="btn-backup" id="btnExportJson">备份</button>
     <button class="btn-import" id="btnImport">导入</button>
     <button class="btn-select" id="btnSelect">选择</button>
-    <button class="btn-select" id="btnSettings" style="flex:0.4;font-size:12px;color:#999;border-color:#ccc">设置</button>
+    <button class="btn-import" id="btnSettings" style="flex:0.7">设置</button>
   </div>
   <div class="batch-bar" id="batchBar">
     <span class="selected-count" id="selectedCount">已选 0 人</span>
@@ -632,6 +631,7 @@
     list.forEach(function(p) {
       rows.push([p.name, p.class, p.studentId, p.phone, p.notes]);
     });
+    if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
     var ws = XLSX.utils.aoa_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '通讯录');
@@ -767,6 +767,7 @@
       }
 
       if (ext === 'xlsx' || ext === 'xls') {
+        if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
         try {
           var wb = XLSX.read(e.target.result, { type: 'array' });
           var sheetName = wb.SheetNames[0];
@@ -990,6 +991,9 @@
 
   initData();
 })();
+</script>
+<script>// Load XLSX async so it doesn't block the page
+(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.async=true;document.head.appendChild(s);})();
 </script>
 </body>
 </html>
