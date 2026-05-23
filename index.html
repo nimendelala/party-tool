@@ -591,9 +591,13 @@
       return result;
     }
 
+    function noCacheUrl(base) {
+      return base + '?_t=' + Date.now();
+    }
+
     function save() {
       saveLocal();
-      fetch('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest', {
+      fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
         headers: { 'X-Master-Key': API_KEY }
       }).then(function(res) {
         if (!res.ok) throw new Error('fetch failed');
@@ -617,7 +621,7 @@
     }
 
     function sync() {
-      fetch('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest', {
+      fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
         headers: { 'X-Master-Key': API_KEY }
       }).then(function(res) {
         if (!res.ok) throw new Error('fetch failed');
@@ -642,7 +646,7 @@
       set deletedIds(v) { del = v; },
       save: save,
       sync: sync,
-      startSync: function() { sync(); timer = setInterval(sync, 30000); }
+      startSync: function() { sync(); timer = setInterval(sync, 10000); }
     };
   }
 
@@ -1436,6 +1440,14 @@
   showView('home');
   engine.startSync();
   taskEngine.startSync();
+
+  // Sync immediately when user returns to this tab
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      engine.sync();
+      taskEngine.sync();
+    }
+  });
 })();
 </script>
 <script>// Unregister old PWA service worker
