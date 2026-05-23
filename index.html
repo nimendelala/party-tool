@@ -592,7 +592,7 @@
     }
 
     function noCacheUrl(base) {
-      return base + '?_t=' + Date.now();
+      return base + '?_t=' + Date.now() + '&_r=' + Math.random().toString(36).slice(2, 8);
     }
 
     function save() {
@@ -616,7 +616,32 @@
           body: JSON.stringify(body)
         });
       }).then(function() {
-        del = {};
+        // Re-fetch after PUT to confirm our changes and pull in any concurrent edits
+        return fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
+          headers: { 'X-Master-Key': API_KEY }
+        });
+      }).then(function(res) {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.json();
+      }).then(function(data) {
+        var remote = data.record[opts.dataKey] || [];
+        var arr = opts.getData();
+        var merged = mergeNewer(remote, arr);
+        Object.keys(del).forEach(function(id) { delete merged[id]; });
+        var result = Object.keys(merged).map(function(id) { return merged[id]; });
+        // Update local if post-PUT merge differs (picked up concurrent edits)
+        if (JSON.stringify(result) !== JSON.stringify(arr)) {
+          arr.length = 0;
+          result.forEach(function(item) { arr.push(item); });
+          saveLocal();
+          opts.onRemoteUpdate();
+        }
+        // Only clear deletions that remote confirms are gone
+        var remoteIds = {};
+        remote.forEach(function(item) { remoteIds[item.id] = true; });
+        Object.keys(del).forEach(function(id) {
+          if (!remoteIds[id]) delete del[id];
+        });
       }).catch(function() {});
     }
 
@@ -630,11 +655,18 @@
         var remoteArr = data.record[opts.dataKey] || [];
         var arr = opts.getData();
         var merged = mergeNewer(arr, remoteArr);
+        // Filter out items we know we deleted — prevent resurrection
+        Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
+        // Clean up del: confirmed-deleted IDs (gone from remote) can be cleared
+        var remoteIds = {};
+        remoteArr.forEach(function(item) { remoteIds[item.id] = true; });
+        Object.keys(del).forEach(function(id) {
+          if (!remoteIds[id]) delete del[id];
+        });
         if (JSON.stringify(result) !== JSON.stringify(arr)) {
           arr.length = 0;
           result.forEach(function(item) { arr.push(item); });
-          del = {};
           saveLocal();
           opts.onRemoteUpdate();
         }
