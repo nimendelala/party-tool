@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#c0392b">
-<link rel="manifest" href="/party-tool/manifest.json">
+<link rel="manifest" href="/party-tool/manifest.json" crossorigin="use-credentials">
 <link rel="apple-touch-icon" href="/party-tool/icon.svg">
 <title>体育系党支部工具箱</title>
 <style>
@@ -321,6 +321,49 @@
   .home-card.card-students { border-color: #c0392b; }
   .home-card.card-tasks { border-color: #2980b9; }
 
+  /* Install banner */
+  .install-banner {
+    display: none;
+    margin-top: 20px;
+    padding: 16px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    position: relative;
+  }
+  .install-banner.show { display: block; }
+  .install-text {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 12px;
+  }
+  .install-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background: #2980b9;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .install-btn:active { background: #2471a3; }
+  .install-close {
+    position: absolute;
+    top: 4px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .install-close:active { color: #999; }
+
   /* Task list */
   .task-count {
     font-size: 13px;
@@ -416,6 +459,11 @@
         <div class="card-title">工作列表</div>
         <div class="card-subtitle">查看和管理待办工作任务</div>
       </div>
+    </div>
+    <div class="install-banner" id="installBanner">
+      <div class="install-text">点击下方按钮将此应用安装到手机桌面，像 App 一样使用</div>
+      <button class="install-btn" id="installBtn">📲 安装到桌面</button>
+      <button class="install-close" id="installClose">×</button>
     </div>
   </div>
 
@@ -1098,6 +1146,36 @@
   });
   document.getElementById('backFromTasks').addEventListener('click', function() {
     showView('home');
+  });
+
+  // ====== PWA Install ======
+  var deferredPrompt = null;
+  var installBanner = document.getElementById('installBanner');
+  var installBtn = document.getElementById('installBtn');
+  var installClose = document.getElementById('installClose');
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBanner.classList.add('show');
+  });
+
+  installBtn.addEventListener('click', function() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(choice) {
+      installBanner.classList.remove('show');
+      deferredPrompt = null;
+    });
+  });
+
+  installClose.addEventListener('click', function() {
+    installBanner.classList.remove('show');
+  });
+
+  window.addEventListener('appinstalled', function() {
+    installBanner.classList.remove('show');
+    deferredPrompt = null;
   });
 
   // ====== Task Module ======
