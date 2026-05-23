@@ -255,6 +255,7 @@
   .batch-bar {
     display: none;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 12px;
     padding: 10px 12px;
@@ -275,6 +276,23 @@
   .batch-bar .btn-select-all { background: #e8e8e8; color: #555; }
   .batch-bar .btn-delete-batch { background: #e74c3c; color: #fff; }
   .batch-bar .btn-cancel-batch { background: #e8e8e8; color: #666; }
+  .batch-bar .btn-edit-batch { background: #2980b9; color: #fff; }
+
+  /* Batch edit modal */
+  .batch-edit-field-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: background 0.15s;
+  }
+  .batch-edit-field-btn:active { background: #f0f0f0; }
 
   /* View switching */
   .view { display: none; }
@@ -432,6 +450,7 @@
     <div class="batch-bar" id="batchBar">
       <span class="selected-count" id="selectedCount">已选 0 人</span>
       <button class="btn-select-all" id="btnSelectAll">全选</button>
+      <button class="btn-edit-batch" id="btnEditBatch">批量修改</button>
       <button class="btn-delete-batch" id="btnDeleteBatch">删除</button>
       <button class="btn-cancel-batch" id="btnCancelBatch">取消</button>
     </div>
@@ -480,6 +499,21 @@
       <button class="btn-cancel" id="btnCancel">取消</button>
       <button class="btn-delete" id="btnDelete" style="display:none">删除</button>
       <button class="btn-save" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="batchEditModal">
+  <div class="modal">
+    <h3 id="batchEditModalTitle">批量修改</h3>
+    <div id="batchEditFieldList"></div>
+    <div class="form-group" id="batchEditValueGroup" style="display:none">
+      <label id="batchEditValueLabel">新值</label>
+      <input type="text" id="fbatchValue" placeholder="请输入新值">
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="btnBatchEditCancel">取消</button>
+      <button class="btn-save" id="btnBatchEditApply" style="display:none">应用到已选</button>
     </div>
   </div>
 </div>
@@ -1039,6 +1073,96 @@
     render(searchInput.value);
   });
 
+  // Batch edit
+  var batchEditModal = document.getElementById('batchEditModal');
+  var batchEditFieldList = document.getElementById('batchEditFieldList');
+  var batchEditValueGroup = document.getElementById('batchEditValueGroup');
+  var batchEditValueLabel = document.getElementById('batchEditValueLabel');
+  var fbatchValue = document.getElementById('fbatchValue');
+  var btnBatchEditCancel = document.getElementById('btnBatchEditCancel');
+  var btnBatchEditApply = document.getElementById('btnBatchEditApply');
+  var batchEditField = null;
+
+  var batchEditFields = [
+    { key: 'studentId', label: '当前状态' },
+    { key: 'class', label: '班级' },
+    { key: 'phone', label: '电话' },
+    { key: 'notes', label: '备注' }
+  ];
+
+  function openBatchEditModal() {
+    var ids = Object.keys(selectedIds);
+    if (ids.length === 0) { alert('请先选择学生'); return; }
+    document.getElementById('batchEditModalTitle').textContent = '批量修改（已选 ' + ids.length + ' 人）';
+    batchEditField = null;
+    fbatchValue.value = '';
+    batchEditValueGroup.style.display = 'none';
+    btnBatchEditApply.style.display = 'none';
+
+    batchEditFieldList.innerHTML = batchEditFields.map(function(f) {
+      return '<button class="batch-edit-field-btn" data-key="' + f.key + '">' + f.label + '</button>';
+    }).join('');
+
+    batchEditModal.classList.add('active');
+  }
+
+  function selectBatchEditField(key) {
+    batchEditField = key;
+    var field = batchEditFields.find(function(f) { return f.key === key; });
+    batchEditValueLabel.textContent = '新的' + field.label;
+    batchEditValueGroup.style.display = '';
+    btnBatchEditApply.style.display = '';
+    fbatchValue.focus();
+
+    // Highlight selected field button
+    batchEditFieldList.querySelectorAll('button').forEach(function(btn) {
+      if (btn.getAttribute('data-key') === key) {
+        btn.style.background = '#fef0ef';
+        btn.style.borderColor = '#c0392b';
+      } else {
+        btn.style.background = '#fff';
+        btn.style.borderColor = '#ddd';
+      }
+    });
+  }
+
+  function applyBatchEdit() {
+    if (!batchEditField) { alert('请先选择要修改的字段'); return; }
+    var newValue = fbatchValue.value.trim();
+    var ids = Object.keys(selectedIds);
+    if (ids.length === 0) return;
+
+    people.forEach(function(p) {
+      if (selectedIds[p.id]) {
+        p[batchEditField] = newValue;
+      }
+    });
+
+    engine.save();
+    closeBatchEditModal();
+    selectedIds = {};
+    selectionMode = false;
+    render(searchInput.value);
+  }
+
+  function closeBatchEditModal() {
+    batchEditModal.classList.remove('active');
+    batchEditField = null;
+  }
+
+  document.getElementById('btnEditBatch').addEventListener('click', openBatchEditModal);
+  btnBatchEditCancel.addEventListener('click', closeBatchEditModal);
+  btnBatchEditApply.addEventListener('click', applyBatchEdit);
+  batchEditModal.addEventListener('click', function(e) {
+    if (e.target === batchEditModal) closeBatchEditModal();
+  });
+  batchEditFieldList.addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (btn && btn.getAttribute('data-key')) {
+      selectBatchEditField(btn.getAttribute('data-key'));
+    }
+  });
+
   // Click card: in selection mode toggle select, otherwise edit
   listEl.addEventListener('click', function(e) {
     var card = e.target.closest('.card');
@@ -1059,7 +1183,9 @@
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      if (taskModal && taskModal.classList.contains('active')) {
+      if (batchEditModal.classList.contains('active')) {
+        closeBatchEditModal();
+      } else if (taskModal && taskModal.classList.contains('active')) {
         closeTaskModal();
       } else if (modal.classList.contains('active')) {
         closeModal();
