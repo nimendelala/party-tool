@@ -479,7 +479,7 @@
 
 <div class="modal-overlay" id="modal">
   <div class="modal">
-    <h3 id="modalTitle">添加联系人</h3>
+    <h3 id="modalTitle">添加学生信息</h3>
     <div class="form-group">
       <label>姓名 *</label>
       <input type="text" id="fname" placeholder="请输入姓名">
@@ -721,7 +721,7 @@
 
   function openModal(person) {
     editingId = person ? person.id : null;
-    modalTitle.textContent = person ? '编辑联系人' : '添加联系人';
+    modalTitle.textContent = person ? '编辑学生信息' : '添加学生信息';
     fname.value = person ? person.name : '';
     fclass.value = person ? person.class : '';
     fstudentId.value = person ? person.studentId : '';
