@@ -367,6 +367,7 @@
   let editingId = null;
   let ghSha = null;
   let syncing = false;
+  let savePending = false;
   let ghToken = localStorage.getItem('gh_token') || '';
 
   function utob(s) { return btoa(unescape(encodeURIComponent(s))); }
@@ -383,40 +384,50 @@
     return h;
   }
 
-  function loadFromGitHub() {
-    // Read via raw URL (no auth needed, but cached)
-    fetch(GH_RAW + '?t=' + Date.now(), { cache: 'no-cache' })
-      .then(function(res) { return res.json(); })
+  // Init: load from localStorage first (fast), then sync with GitHub
+  (function initData() {
+    // 1. Load localStorage immediately
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) people = JSON.parse(raw);
+    } catch (e) { people = []; }
+    render(searchInput.value);
+
+    // 2. Try to sync with GitHub in background
+    fetch(GH_API + '?t=' + Date.now(), { headers: ghHeaders(), cache: 'no-cache' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('API failed');
+        return res.json();
+      })
       .then(function(data) {
-        if (!Array.isArray(data)) throw new Error('invalid');
-        people = data;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-        updateSyncStatus('已加载', '#27ae60');
-        // Also get SHA for writes
-        if (ghToken) {
-          fetch(GH_API, { headers: ghHeaders() })
-            .then(function(res) { return res.json(); })
-            .then(function(d) { ghSha = d.sha; })
-            .catch(function() {});
+        var remote = JSON.parse(btou(data.content));
+        if (!Array.isArray(remote)) throw new Error('invalid');
+        ghSha = data.sha;
+        // Merge: GitHub is source of truth if it has more data
+        if (remote.length >= people.length) {
+          people = remote;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+          updateSyncStatus('已同步', '#27ae60');
+        } else if (people.length > remote.length) {
+          // Local has more data, push to GitHub if we have a token
+          updateSyncStatus('本地数据更多', '#f39c12');
+          if (ghToken) pushToGitHub();
         }
         render(searchInput.value);
       }).catch(function() {
-        try {
-          var raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) people = JSON.parse(raw);
-        } catch (e) { people = []; }
-        updateSyncStatus('离线模式', '#e67e22');
-        render(searchInput.value);
+        // GitHub unreachable, use localStorage
+        if (people.length > 0) {
+          updateSyncStatus('离线模式', '#e67e22');
+        } else {
+          updateSyncStatus('无数据', '#aaa');
+        }
       });
-  }
+  })();
 
-  function saveToGitHub() {
-    if (syncing || !ghToken) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-      if (!ghToken) updateSyncStatus('未配置Token', '#e67e22');
-      return;
-    }
+  function pushToGitHub() {
+    if (syncing || !ghToken) return;
     syncing = true;
+    savePending = false;
     updateSyncStatus('同步中...', '#aaa');
     var content = utob(JSON.stringify(people));
     var body = { message: '更新数据', content: content };
@@ -426,44 +437,62 @@
       headers: { 'Authorization': 'token ' + ghToken, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }).then(function(res) {
-      if (!res.ok) { throw new Error('save failed'); }
+      if (!res.ok) return res.json().then(function(e) { throw new Error(e.message || 'save failed'); });
       return res.json();
     }).then(function(data) {
       ghSha = data.content.sha;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
       updateSyncStatus('已同步', '#27ae60');
       syncing = false;
-    }).catch(function() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-      updateSyncStatus('保存失败', '#e74c3c');
+      if (savePending) pushToGitHub();
+    }).catch(function(err) {
+      updateSyncStatus('保存失败: ' + (err.message || ''), '#e74c3c');
       syncing = false;
+      savePending = true;
     });
   }
 
   function save() {
-    saveToGitHub();
+    // Always save to localStorage first
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+    // Debounced push to GitHub
+    savePending = true;
+    if (!syncing && ghToken) {
+      pushToGitHub();
+    } else if (!ghToken) {
+      updateSyncStatus('未配置Token', '#e67e22');
+    }
   }
 
-  // Auto-sync: poll every 15 seconds for changes
+  // Debounce: check every 2 seconds if there's a pending save
   setInterval(function() {
-    if (syncing) return;
-    fetch(GH_RAW + '?t=' + Date.now())
-      .then(function(res) { return res.json(); })
+    if (savePending && !syncing && ghToken) {
+      pushToGitHub();
+    }
+  }, 2000);
+
+  // Poll GitHub for remote changes every 20 seconds
+  setInterval(function() {
+    if (syncing || savePending) return;
+    fetch(GH_API + '?t=' + Date.now(), { headers: ghHeaders(), cache: 'no-cache' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('poll failed');
+        return res.json();
+      })
       .then(function(data) {
-        if (!Array.isArray(data)) throw new Error('invalid');
-        var newJson = JSON.stringify(data);
-        var oldJson = JSON.stringify(people);
-        if (newJson !== oldJson) {
-          people = data;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-          updateSyncStatus('已同步', '#27ae60');
-          render(searchInput.value);
+        if (data.sha !== ghSha) {
+          ghSha = data.sha;
+          var remote = JSON.parse(btou(data.content));
+          if (!Array.isArray(remote)) throw new Error('invalid');
+          if (JSON.stringify(remote) !== JSON.stringify(people)) {
+            people = remote;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+            updateSyncStatus('已同步', '#27ae60');
+            render(searchInput.value);
+          }
         }
       }).catch(function() {});
-  }, 15000);
-
-  // Init
-  loadFromGitHub();
+  }, 20000);
 
   const listEl = document.getElementById('list');
   const countEl = document.getElementById('peopleCount');
