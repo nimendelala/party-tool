@@ -511,7 +511,6 @@
   const TASK_BIN_ID = '6a1211c36610dd3ae8947a52';
   let people = [];
   let editingId = null;
-  var deletedIds = {};
 
   // Load from localStorage first for instant display
   try {
@@ -522,72 +521,83 @@
     }
   } catch (e) { people = []; }
 
-  function saveLocal() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ students: people }));
-  }
+  // Generic sync engine — shared by students and tasks
+  function createSyncEngine(opts) {
+    var del = {};
+    var timer = null;
 
-  function save() {
-    saveLocal();
-    // Read-modify-write: fetch latest cloud data, merge local changes, then push
-    fetch('https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest', {
-      headers: { 'X-Master-Key': API_KEY }
-    }).then(function(res) {
-      if (!res.ok) throw new Error('fetch failed');
-      return res.json();
-    }).then(function(data) {
-      var remote = data.record.students || [];
-      var merged = {};
-      // Start with remote data (preserves others' changes)
-      remote.forEach(function(p) { merged[p.id] = p; });
-      // Overwrite/add with local data
-      people.forEach(function(p) { merged[p.id] = p; });
-      // Remove locally deleted records
-      Object.keys(deletedIds).forEach(function(id) { delete merged[id]; });
-      // Build result array
-      var result = Object.keys(merged).map(function(id) { return merged[id]; });
-      // PUT merged result
-      return fetch('https://api.jsonbin.io/v3/b/' + BIN_ID, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': API_KEY
-        },
-        body: JSON.stringify({ students: result })
-      });
-    }).then(function() {
-      // Success: clear delete tracking, update local to match what's on cloud
-      deletedIds = {};
-    }).catch(function() { /* network error, keep deletedIds for retry */ });
-  }
+    function saveLocal() {
+      var d = {};
+      d[opts.dataKey] = opts.getData();
+      localStorage.setItem(opts.storageKey, JSON.stringify(d));
+    }
 
-  var cloudSyncTimer = null;
+    function save() {
+      saveLocal();
+      fetch('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest', {
+        headers: { 'X-Master-Key': API_KEY }
+      }).then(function(res) {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.json();
+      }).then(function(data) {
+        var remote = data.record[opts.dataKey] || [];
+        var arr = opts.getData();
+        var merged = {};
+        remote.forEach(function(item) { merged[item.id] = item; });
+        arr.forEach(function(item) { merged[item.id] = item; });
+        Object.keys(del).forEach(function(id) { delete merged[id]; });
+        var result = Object.keys(merged).map(function(id) { return merged[id]; });
+        var body = {};
+        body[opts.dataKey] = result;
+        return fetch('https://api.jsonbin.io/v3/b/' + opts.binId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+          body: JSON.stringify(body)
+        });
+      }).then(function() {
+        del = {};
+      }).catch(function() {});
+    }
 
-  function syncFromCloud() {
-    fetch('https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest', {
-      headers: { 'X-Master-Key': API_KEY }
-    }).then(function(res) {
-      if (!res.ok) throw new Error('fetch failed');
-      return res.json();
-    }).then(function(data) {
-      var remoteStudents = data.record.students || [];
-      if (JSON.stringify(remoteStudents) !== JSON.stringify(people)) {
-        people = remoteStudents;
-        deletedIds = {};
-        saveLocal();
-        render(searchInput.value);
-        // Reset selection on remote update
-        selectedIds = {};
-        if (selectionMode) {
-          selectionMode = false;
+    function sync() {
+      fetch('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest', {
+        headers: { 'X-Master-Key': API_KEY }
+      }).then(function(res) {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.json();
+      }).then(function(data) {
+        var remoteArr = data.record[opts.dataKey] || [];
+        var arr = opts.getData();
+        if (JSON.stringify(remoteArr) !== JSON.stringify(arr)) {
+          arr.length = 0;
+          remoteArr.forEach(function(item) { arr.push(item); });
+          del = {};
+          saveLocal();
+          opts.onRemoteUpdate();
         }
-      }
-    }).catch(function() { /* network error, try again later */ });
+      }).catch(function() {});
+    }
+
+    return {
+      get deletedIds() { return del; },
+      set deletedIds(v) { del = v; },
+      save: save,
+      sync: sync,
+      startSync: function() { sync(); timer = setInterval(sync, 30000); }
+    };
   }
 
-  function startCloudSync() {
-    syncFromCloud();
-    cloudSyncTimer = setInterval(syncFromCloud, 30000);
-  }
+  var engine = createSyncEngine({
+    binId: BIN_ID,
+    storageKey: STORAGE_KEY,
+    dataKey: 'students',
+    getData: function() { return people; },
+    onRemoteUpdate: function() {
+      render(searchInput.value);
+      selectedIds = {};
+      if (selectionMode) selectionMode = false;
+    }
+  });
 
   const listEl = document.getElementById('list');
   const countEl = document.getElementById('peopleCount');
@@ -648,6 +658,10 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
   function openModal(person) {
     editingId = person ? person.id : null;
     modalTitle.textContent = person ? '编辑联系人' : '添加联系人';
@@ -671,7 +685,7 @@
     if (!name) { alert('请至少填写姓名'); return; }
 
     var data = {
-      id: editingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: editingId || genId(),
       name: name,
       class: fclass.value.trim(),
       studentId: fstudentId.value.trim(),
@@ -686,7 +700,7 @@
       people.push(data);
     }
 
-    save();
+    engine.save();
     closeModal();
     render(searchInput.value);
   }
@@ -695,8 +709,8 @@
     if (!editingId) return;
     if (!confirm('确定删除该联系人吗？')) return;
     people = people.filter(function(p) { return p.id !== editingId; });
-    deletedIds[editingId] = true;
-    save();
+    engine.deletedIds[editingId] = true;
+    engine.save();
     closeModal();
     render(searchInput.value);
   }
@@ -713,62 +727,43 @@
     render(this.value);
   });
 
-  // CSV export
-  function csvEscape(val) {
-    if (val == null) return '';
-    var s = String(val);
-    if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-    return s;
-  }
-
-  document.getElementById('btnExportCsv').addEventListener('click', function() {
-    var selectedArr = Object.keys(selectedIds);
-    var list = selectedArr.length > 0
-      ? people.filter(function(p) { return selectedIds[p.id]; })
-      : people;
-    if (list.length === 0) { alert('没有数据可导出'); return; }
-    var header = ['姓名', '班级', '当前状态', '电话', '备注'];
-    var rows = [header];
-    list.forEach(function(p) {
-      rows.push([p.name, p.class, p.studentId, p.phone, p.notes]);
-    });
-    if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
-    var ws = XLSX.utils.aoa_to_sheet(rows);
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '通讯录');
-    var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  function downloadBlob(blob, filename) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url;
-    a.download = 'contacts-' + new Date().toISOString().slice(0,10) + '.xlsx';
+    a.href = url; a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    // Clear selection after export
+  }
+
+  function getSelectedOrAll(arr) {
+    var ids = Object.keys(selectedIds);
+    if (ids.length === 0) return arr;
+    return arr.filter(function(p) { return selectedIds[p.id]; });
+  }
+
+  // Excel export
+  document.getElementById('btnExportCsv').addEventListener('click', function() {
+    var list = getSelectedOrAll(people);
+    if (list.length === 0) { alert('没有数据可导出'); return; }
+    if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
+    var rows = [['姓名', '班级', '当前状态', '电话', '备注']];
+    list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.phone, p.notes]); });
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '通讯录');
+    var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'contacts-' + new Date().toISOString().slice(0,10) + '.xlsx');
     selectedIds = {};
     if (selectionMode) render(searchInput.value);
   });
 
   // JSON export (backup)
   document.getElementById('btnExportJson').addEventListener('click', function() {
-    var selectedArr = Object.keys(selectedIds);
-    var list = selectedArr.length > 0
-      ? people.filter(function(p) { return selectedIds[p.id]; })
-      : people;
+    var list = getSelectedOrAll(people);
     if (list.length === 0) { alert('没有数据可导出'); return; }
-    var blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'contacts-backup-' + new Date().toISOString().slice(0,10) + '.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' }), 'contacts-backup-' + new Date().toISOString().slice(0,10) + '.json');
   });
 
   // Import (CSV + JSON)
@@ -783,7 +778,7 @@
         added++;
       }
     });
-    save();
+    engine.save();
     render(searchInput.value);
     alert('导入完成！新增 ' + added + ' 人，跳过 ' + (imported.length - added) + ' 个重复记录。');
   }
@@ -838,7 +833,7 @@
     for (var i = 0; i < rows.length; i++) {
       var vals = rows[i];
       result.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + i,
+        id: genId() + i,
         name: (vals[nameIdx] || '').toString().trim(),
         class: classIdx !== -1 ? (vals[classIdx] || '').toString().trim() : '',
         studentId: sidIdx !== -1 ? (vals[sidIdx] || '').toString().trim() : '',
@@ -1037,10 +1032,10 @@
     if (ids.length === 0) { alert('请先选择要删除的学生'); return; }
     if (!confirm('确定删除选中的 ' + ids.length + ' 名学生吗？此操作不可恢复。')) return;
     people = people.filter(function(p) { return !selectedIds[p.id]; });
-    ids.forEach(function(id) { deletedIds[id] = true; });
+    ids.forEach(function(id) { engine.deletedIds[id] = true; });
     selectedIds = {};
     selectionMode = false;
-    save();
+    engine.save();
     render(searchInput.value);
   });
 
@@ -1101,8 +1096,6 @@
   var TASK_STORAGE_KEY = 'task_app_data';
   var tasks = [];
   var taskEditingId = null;
-  var taskDeletedIds = {};
-
   try {
     var taskRaw = localStorage.getItem(TASK_STORAGE_KEY);
     if (taskRaw) {
@@ -1111,63 +1104,18 @@
     }
   } catch (e) { tasks = []; }
 
-  function saveTasksLocal() {
-    localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify({ tasks: tasks }));
-  }
-
-  function saveTasks() {
-    saveTasksLocal();
-    fetch('https://api.jsonbin.io/v3/b/' + TASK_BIN_ID + '/latest', {
-      headers: { 'X-Master-Key': API_KEY }
-    }).then(function(res) {
-      if (!res.ok) throw new Error('fetch failed');
-      return res.json();
-    }).then(function(data) {
-      var remote = data.record.tasks || [];
-      var merged = {};
-      remote.forEach(function(t) { merged[t.id] = t; });
-      tasks.forEach(function(t) { merged[t.id] = t; });
-      Object.keys(taskDeletedIds).forEach(function(id) { delete merged[id]; });
-      var result = Object.keys(merged).map(function(id) { return merged[id]; });
-      return fetch('https://api.jsonbin.io/v3/b/' + TASK_BIN_ID, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': API_KEY
-        },
-        body: JSON.stringify({ tasks: result })
-      });
-    }).then(function() {
-      taskDeletedIds = {};
-    }).catch(function() { /* network error, keep deletedIds for retry */ });
-  }
-
-  var taskCloudSyncTimer = null;
-
-  function syncTasksFromCloud() {
-    fetch('https://api.jsonbin.io/v3/b/' + TASK_BIN_ID + '/latest', {
-      headers: { 'X-Master-Key': API_KEY }
-    }).then(function(res) {
-      if (!res.ok) throw new Error('fetch failed');
-      return res.json();
-    }).then(function(data) {
-      var remoteTasks = data.record.tasks || [];
-      if (JSON.stringify(remoteTasks) !== JSON.stringify(tasks)) {
-        tasks = remoteTasks;
-        taskDeletedIds = {};
-        saveTasksLocal();
-        var taskView = document.getElementById('view-tasks');
-        if (taskView.classList.contains('active')) {
-          renderTasks(document.getElementById('taskSearchInput').value);
-        }
+  var taskEngine = createSyncEngine({
+    binId: TASK_BIN_ID,
+    storageKey: TASK_STORAGE_KEY,
+    dataKey: 'tasks',
+    getData: function() { return tasks; },
+    onRemoteUpdate: function() {
+      var taskView = document.getElementById('view-tasks');
+      if (taskView.classList.contains('active')) {
+        renderTasks(document.getElementById('taskSearchInput').value);
       }
-    }).catch(function() { /* network error, try again later */ });
-  }
-
-  function startTaskCloudSync() {
-    syncTasksFromCloud();
-    taskCloudSyncTimer = setInterval(syncTasksFromCloud, 30000);
-  }
+    }
+  });
 
   // Task render
   var taskListEl = document.getElementById('taskList');
@@ -1241,7 +1189,7 @@
 
     var existing = taskEditingId ? tasks.find(function(t) { return t.id === taskEditingId; }) : null;
     var data = {
-      id: taskEditingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: taskEditingId || genId(),
       title: title,
       notes: ftaskNotes.value.trim(),
       completed: existing ? existing.completed : false,
@@ -1255,7 +1203,7 @@
       tasks.push(data);
     }
 
-    saveTasks();
+    taskEngine.save();
     closeTaskModal();
     renderTasks(taskSearchInput.value);
   }
@@ -1264,8 +1212,8 @@
     if (!taskEditingId) return;
     if (!confirm('确定删除该任务吗？')) return;
     tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
-    taskDeletedIds[taskEditingId] = true;
-    saveTasks();
+    taskEngine.deletedIds[taskEditingId] = true;
+    taskEngine.save();
     closeTaskModal();
     renderTasks(taskSearchInput.value);
   }
@@ -1274,7 +1222,7 @@
     var task = tasks.find(function(t) { return t.id === id; });
     if (task) {
       task.completed = !task.completed;
-      saveTasks();
+      taskEngine.save();
       renderTasks(taskSearchInput.value);
     }
   }
@@ -1307,8 +1255,8 @@
       if (action === 'delete') {
         if (!confirm('确定删除该任务吗？')) return;
         tasks = tasks.filter(function(t) { return t.id !== id; });
-        taskDeletedIds[id] = true;
-        saveTasks();
+        taskEngine.deletedIds[id] = true;
+        taskEngine.save();
         renderTasks(taskSearchInput.value);
         return;
       }
@@ -1325,8 +1273,8 @@
 
   // ====== Init ======
   showView('home');
-  startCloudSync();
-  startTaskCloudSync();
+  engine.startSync();
+  taskEngine.startSync();
 })();
 </script>
 <script>// Unregister old PWA service worker
