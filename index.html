@@ -297,6 +297,7 @@
     <button class="btn-backup" id="btnExportJson">备份</button>
     <button class="btn-import" id="btnImport">导入</button>
     <button class="btn-select" id="btnSelect">选择</button>
+    <button class="btn-select" id="btnSettings" style="flex:0.4;font-size:12px;color:#999;border-color:#ccc">设置</button>
   </div>
   <div class="batch-bar" id="batchBar">
     <span class="selected-count" id="selectedCount">已选 0 人</span>
@@ -306,7 +307,10 @@
   </div>
   <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls" style="display:none">
 
-  <div class="people-count" id="peopleCount"></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="people-count" id="peopleCount" style="flex:1;margin-bottom:0"></div>
+    <div class="sync-status" id="syncStatus" style="font-size:11px;color:#aaa">同步中...</div>
+  </div>
   <div class="list" id="list"></div>
 </div>
 
@@ -338,23 +342,128 @@
       <button class="btn-delete" id="btnDelete" style="display:none">删除</button>
       <button class="btn-save" id="btnSave">保存</button>
     </div>
+  
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h3>同步设置</h3>
+    <div class="form-group">
+      <label>GitHub Token（用于写入数据）</label>
+      <input type="password" id="ftoken" placeholder="粘贴 GitHub Token">
+      <div style="font-size:12px;color:#999;margin-top:4px">无 Token 时只能查看，不能修改。Token 仅保存在本机。</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="btnSettingsCancel">取消</button>
+      <button class="btn-save" id="btnSettingsSave">保存</button>
+    </div>
   </div>
 </div>
 
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
+  const GH_RAW = 'https://raw.githubusercontent.com/nimendelala/party-tool/master/data.json';
+  const GH_API = 'https://api.github.com/repos/nimendelala/party-tool/contents/data.json';
   let people = [];
   let editingId = null;
+  let ghSha = null;
+  let syncing = false;
+  let ghToken = localStorage.getItem('gh_token') || '';
 
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) people = JSON.parse(raw);
-  } catch (e) { people = []; }
+  function utob(s) { return btoa(unescape(encodeURIComponent(s))); }
+  function btou(s) { return decodeURIComponent(escape(atob(s))); }
+
+  function updateSyncStatus(text, color) {
+    var el = document.getElementById('syncStatus');
+    if (el) { el.textContent = text; el.style.color = color || '#aaa'; }
+  }
+
+  function ghHeaders() {
+    var h = { 'Cache-Control': 'no-cache' };
+    if (ghToken) h['Authorization'] = 'token ' + ghToken;
+    return h;
+  }
+
+  function loadFromGitHub() {
+    // Read via raw URL (no auth needed, but cached)
+    fetch(GH_RAW + '?t=' + Date.now(), { cache: 'no-cache' })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!Array.isArray(data)) throw new Error('invalid');
+        people = data;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+        updateSyncStatus('已加载', '#27ae60');
+        // Also get SHA for writes
+        if (ghToken) {
+          fetch(GH_API, { headers: ghHeaders() })
+            .then(function(res) { return res.json(); })
+            .then(function(d) { ghSha = d.sha; })
+            .catch(function() {});
+        }
+        render(searchInput.value);
+      }).catch(function() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) people = JSON.parse(raw);
+        } catch (e) { people = []; }
+        updateSyncStatus('离线模式', '#e67e22');
+        render(searchInput.value);
+      });
+  }
+
+  function saveToGitHub() {
+    if (syncing || !ghToken) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+      if (!ghToken) updateSyncStatus('未配置Token', '#e67e22');
+      return;
+    }
+    syncing = true;
+    updateSyncStatus('同步中...', '#aaa');
+    var content = utob(JSON.stringify(people));
+    var body = { message: '更新数据', content: content };
+    if (ghSha) body.sha = ghSha;
+    fetch(GH_API, {
+      method: 'PUT',
+      headers: { 'Authorization': 'token ' + ghToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(res) {
+      if (!res.ok) { throw new Error('save failed'); }
+      return res.json();
+    }).then(function(data) {
+      ghSha = data.content.sha;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+      updateSyncStatus('已同步', '#27ae60');
+      syncing = false;
+    }).catch(function() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+      updateSyncStatus('保存失败', '#e74c3c');
+      syncing = false;
+    });
+  }
 
   function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+    saveToGitHub();
   }
+
+  // Auto-sync: poll every 15 seconds for changes
+  setInterval(function() {
+    if (syncing) return;
+    fetch(GH_RAW + '?t=' + Date.now())
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!Array.isArray(data)) throw new Error('invalid');
+        var newJson = JSON.stringify(data);
+        var oldJson = JSON.stringify(people);
+        if (newJson !== oldJson) {
+          people = data;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+          updateSyncStatus('已同步', '#27ae60');
+          render(searchInput.value);
+        }
+      }).catch(function() {});
+  }, 15000);
+
+  // Init
+  loadFromGitHub();
 
   const listEl = document.getElementById('list');
   const countEl = document.getElementById('peopleCount');
@@ -777,6 +886,33 @@
     selectionMode = !selectionMode;
     if (!selectionMode) selectedIds = {};
     render(searchInput.value);
+  });
+
+  // Settings
+  var settingsModal = document.getElementById('settingsModal');
+  var ftoken = document.getElementById('ftoken');
+  document.getElementById('btnSettings').addEventListener('click', function() {
+    ftoken.value = ghToken;
+    settingsModal.classList.add('active');
+  });
+  document.getElementById('btnSettingsCancel').addEventListener('click', function() {
+    settingsModal.classList.remove('active');
+  });
+  document.getElementById('btnSettingsSave').addEventListener('click', function() {
+    ghToken = ftoken.value.trim();
+    localStorage.setItem('gh_token', ghToken);
+    settingsModal.classList.remove('active');
+    if (ghToken) {
+      updateSyncStatus('准备同步...', '#aaa');
+      // Re-fetch SHA
+      fetch(GH_API, { headers: ghHeaders() })
+        .then(function(res) { return res.json(); })
+        .then(function(d) { ghSha = d.sha; updateSyncStatus('已连接', '#27ae60'); })
+        .catch(function() { updateSyncStatus('连接失败', '#e74c3c'); });
+    }
+  });
+  settingsModal.addEventListener('click', function(e) {
+    if (e.target === settingsModal) settingsModal.classList.remove('active');
   });
 
   btnCancelBatch.addEventListener('click', function() {
