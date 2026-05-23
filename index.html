@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#c0392b">
-<link rel="manifest" href="/party-tool/manifest.json" crossorigin="use-credentials">
-<link rel="apple-touch-icon" href="/party-tool/icon.svg">
 <title>体育系党支部工具箱</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -321,49 +318,6 @@
   .home-card.card-students { border-color: #c0392b; }
   .home-card.card-tasks { border-color: #2980b9; }
 
-  /* Install banner */
-  .install-banner {
-    display: none;
-    margin-top: 20px;
-    padding: 16px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    text-align: center;
-    position: relative;
-  }
-  .install-banner.show { display: block; }
-  .install-text {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 12px;
-  }
-  .install-btn {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    background: #2980b9;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .install-btn:active { background: #2471a3; }
-  .install-close {
-    position: absolute;
-    top: 4px;
-    right: 12px;
-    background: none;
-    border: none;
-    color: #ccc;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 4px;
-  }
-  .install-close:active { color: #999; }
-
   /* Task list */
   .task-count {
     font-size: 13px;
@@ -459,11 +413,6 @@
         <div class="card-title">工作列表</div>
         <div class="card-subtitle">查看和管理待办工作任务</div>
       </div>
-    </div>
-    <div class="install-banner" id="installBanner">
-      <div class="install-text">点击下方按钮将此应用安装到手机桌面，像 App 一样使用</div>
-      <button class="install-btn" id="installBtn">📲 安装到桌面</button>
-      <button class="install-close" id="installClose">×</button>
     </div>
   </div>
 
@@ -1148,50 +1097,6 @@
     showView('home');
   });
 
-  // ====== PWA Install ======
-  var deferredPrompt = null;
-  var installBanner = document.getElementById('installBanner');
-  var installBtn = document.getElementById('installBtn');
-  var installClose = document.getElementById('installClose');
-  var isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-
-  window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (!isStandalone) installBanner.classList.add('show');
-  });
-
-  installBtn.addEventListener('click', function() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(function(choice) {
-        installBanner.classList.remove('show');
-        deferredPrompt = null;
-      });
-    } else {
-      // Fallback: show manual instructions
-      alert('请使用浏览器菜单中的"添加到主屏幕"功能安装此应用。\n\nAndroid Chrome: 右上角 ⋮ → 添加到主屏幕\niPhone Safari: 底部分享按钮 → 添加到主屏幕');
-    }
-  });
-
-  installClose.addEventListener('click', function() {
-    installBanner.classList.remove('show');
-  });
-
-  window.addEventListener('appinstalled', function() {
-    installBanner.classList.remove('show');
-    deferredPrompt = null;
-  });
-
-  // Fallback: show banner after 5s if browser supports PWA but event hasn't fired
-  if ('serviceWorker' in navigator && !isStandalone) {
-    setTimeout(function() {
-      if (!deferredPrompt && installBanner) {
-        installBanner.classList.add('show');
-      }
-    }, 5000);
-  }
-
   // ====== Task Module ======
   var TASK_STORAGE_KEY = 'task_app_data';
   var tasks = [];
@@ -1423,11 +1328,6 @@
   startCloudSync();
   startTaskCloudSync();
 })();
-</script>
-<script>// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/party-tool/sw.js').catch(function() {});
-}
 </script>
 <script>// Load XLSX async so it doesn't block the page
 (function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.async=true;document.head.appendChild(s);})();
