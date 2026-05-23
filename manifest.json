@@ -1,0 +1,19 @@
+{
+  "name": "体育系党支部工具箱",
+  "short_name": "党支部工具箱",
+  "description": "学生信息管理与工作列表",
+  "start_url": "/party-tool/",
+  "scope": "/party-tool/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f2f5",
+  "theme_color": "#c0392b",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

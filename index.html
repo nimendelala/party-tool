@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#c0392b">
+<link rel="manifest" href="/party-tool/manifest.json">
+<link rel="apple-touch-icon" href="/party-tool/icon.svg">
 <title>体育系党支部工具箱</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1328,6 +1331,11 @@
   startCloudSync();
   startTaskCloudSync();
 })();
+</script>
+<script>// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/party-tool/sw.js').catch(function() {});
+}
 </script>
 <script>// Load XLSX async so it doesn't block the page
 (function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.async=true;document.head.appendChild(s);})();
