@@ -345,6 +345,7 @@
   const API_KEY = '$2a$10$ff1X0ElOBiI3CdnVHVhJb./EEXde3B7BJEDtqktwNaAJtgy0BvyM.';
   let people = [];
   let editingId = null;
+  var deletedIds = {};
 
   // Load from localStorage first for instant display
   try {
@@ -361,15 +362,36 @@
 
   function save() {
     saveLocal();
-    // Push to cloud (fire and forget, don't block UI)
-    fetch('https://api.jsonbin.io/v3/b/' + BIN_ID, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY
-      },
-      body: JSON.stringify({ students: people })
-    }).catch(function() { /* network error, will retry on next save */ });
+    // Read-modify-write: fetch latest cloud data, merge local changes, then push
+    fetch('https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest', {
+      headers: { 'X-Master-Key': API_KEY }
+    }).then(function(res) {
+      if (!res.ok) throw new Error('fetch failed');
+      return res.json();
+    }).then(function(data) {
+      var remote = data.record.students || [];
+      var merged = {};
+      // Start with remote data (preserves others' changes)
+      remote.forEach(function(p) { merged[p.id] = p; });
+      // Overwrite/add with local data
+      people.forEach(function(p) { merged[p.id] = p; });
+      // Remove locally deleted records
+      Object.keys(deletedIds).forEach(function(id) { delete merged[id]; });
+      // Build result array
+      var result = Object.keys(merged).map(function(id) { return merged[id]; });
+      // PUT merged result
+      return fetch('https://api.jsonbin.io/v3/b/' + BIN_ID, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': API_KEY
+        },
+        body: JSON.stringify({ students: result })
+      });
+    }).then(function() {
+      // Success: clear delete tracking, update local to match what's on cloud
+      deletedIds = {};
+    }).catch(function() { /* network error, keep deletedIds for retry */ });
   }
 
   var cloudSyncTimer = null;
@@ -384,6 +406,7 @@
       var remoteStudents = data.record.students || [];
       if (JSON.stringify(remoteStudents) !== JSON.stringify(people)) {
         people = remoteStudents;
+        deletedIds = {};
         saveLocal();
         render(searchInput.value);
         // Reset selection on remote update
@@ -506,6 +529,7 @@
     if (!editingId) return;
     if (!confirm('确定删除该联系人吗？')) return;
     people = people.filter(function(p) { return p.id !== editingId; });
+    deletedIds[editingId] = true;
     save();
     closeModal();
     render(searchInput.value);
@@ -847,6 +871,7 @@
     if (ids.length === 0) { alert('请先选择要删除的学生'); return; }
     if (!confirm('确定删除选中的 ' + ids.length + ' 名学生吗？此操作不可恢复。')) return;
     people = people.filter(function(p) { return !selectedIds[p.id]; });
+    ids.forEach(function(id) { deletedIds[id] = true; });
     selectedIds = {};
     selectionMode = false;
     save();
