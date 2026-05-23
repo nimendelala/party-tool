@@ -575,6 +575,20 @@
       localStorage.setItem(opts.storageKey, JSON.stringify(d));
     }
 
+    function mergeNewer(base, incoming) {
+      var result = {};
+      base.forEach(function(item) { result[item.id] = item; });
+      incoming.forEach(function(item) {
+        var exist = result[item.id];
+        if (!exist) { result[item.id] = item; return; }
+        // Keep whichever has the newer updatedAt; incoming wins ties
+        var existTs = exist.updatedAt || '';
+        var itemTs = item.updatedAt || '';
+        if (itemTs >= existTs) result[item.id] = item;
+      });
+      return result;
+    }
+
     function save() {
       saveLocal();
       fetch('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest', {
@@ -585,9 +599,7 @@
       }).then(function(data) {
         var remote = data.record[opts.dataKey] || [];
         var arr = opts.getData();
-        var merged = {};
-        remote.forEach(function(item) { merged[item.id] = item; });
-        arr.forEach(function(item) { merged[item.id] = item; });
+        var merged = mergeNewer(remote, arr);
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
         var body = {};
@@ -611,9 +623,11 @@
       }).then(function(data) {
         var remoteArr = data.record[opts.dataKey] || [];
         var arr = opts.getData();
-        if (JSON.stringify(remoteArr) !== JSON.stringify(arr)) {
+        var merged = mergeNewer(arr, remoteArr);
+        var result = Object.keys(merged).map(function(id) { return merged[id]; });
+        if (JSON.stringify(result) !== JSON.stringify(arr)) {
           arr.length = 0;
-          remoteArr.forEach(function(item) { arr.push(item); });
+          result.forEach(function(item) { arr.push(item); });
           del = {};
           saveLocal();
           opts.onRemoteUpdate();
@@ -733,7 +747,8 @@
       class: fclass.value.trim(),
       studentId: fstudentId.value.trim(),
       phone: fphone.value.trim(),
-      notes: fnotes.value.trim()
+      notes: fnotes.value.trim(),
+      updatedAt: new Date().toISOString()
     };
 
     if (editingId) {
@@ -816,6 +831,7 @@
     people.forEach(function(p) { existIds[p.id] = true; });
     imported.forEach(function(p) {
       if (!existIds[p.id]) {
+        p.updatedAt = new Date().toISOString();
         people.push(p);
         existIds[p.id] = true;
         added++;
@@ -1144,6 +1160,7 @@
     people.forEach(function(p) {
       if (selectedIds[p.id]) {
         p[batchEditField] = newValue;
+        p.updatedAt = new Date().toISOString();
       }
     });
 
@@ -1333,7 +1350,8 @@
       workDate: ftaskDate.value,
       notes: ftaskNotes.value.trim(),
       completed: existing ? existing.completed : false,
-      createdAt: existing ? existing.createdAt : new Date().toISOString()
+      createdAt: existing ? existing.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     if (taskEditingId) {
@@ -1362,6 +1380,7 @@
     var task = tasks.find(function(t) { return t.id === id; });
     if (task) {
       task.completed = !task.completed;
+      task.updatedAt = new Date().toISOString();
       taskEngine.save();
       renderTasks(taskSearchInput.value);
     }
