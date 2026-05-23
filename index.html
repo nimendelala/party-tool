@@ -490,11 +490,15 @@
   }
 
   document.getElementById('btnExportCsv').addEventListener('click', function() {
-    if (people.length === 0) { alert('没有数据可导出'); return; }
+    var selectedArr = Object.keys(selectedIds);
+    var list = selectedArr.length > 0
+      ? people.filter(function(p) { return selectedIds[p.id]; })
+      : people;
+    if (list.length === 0) { alert('没有数据可导出'); return; }
     var bom = '﻿';
     var header = ['姓名', '班级', '学号', '电话', '备注'];
     var rows = [bom + header.map(csvEscape).join(',')];
-    people.forEach(function(p) {
+    list.forEach(function(p) {
       rows.push([p.name, p.class, p.studentId, p.phone, p.notes].map(csvEscape).join(','));
     });
     var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -506,12 +510,19 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    // Clear selection after export
+    selectedIds = {};
+    if (selectionMode) render(searchInput.value);
   });
 
   // JSON export (backup)
   document.getElementById('btnExportJson').addEventListener('click', function() {
-    if (people.length === 0) { alert('没有数据可导出'); return; }
-    var blob = new Blob([JSON.stringify(people, null, 2)], { type: 'application/json' });
+    var selectedArr = Object.keys(selectedIds);
+    var list = selectedArr.length > 0
+      ? people.filter(function(p) { return selectedIds[p.id]; })
+      : people;
+    if (list.length === 0) { alert('没有数据可导出'); return; }
+    var blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;

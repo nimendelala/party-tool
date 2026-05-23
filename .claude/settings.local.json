@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf \"C:/Users/Lenovo/.claude/projects/d--11111\" 2>/dev/null; echo \"done\")",
+      "Bash(npx skills *)",
+      "Bash(python -m http.server 8080)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Lenovo\\.claude\\projects\\d--11111"
+    ]
+  }
+}
