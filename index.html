@@ -341,16 +341,63 @@
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
+  const BIN_ID = '6a120bb6ee5a733b120afb8a';
+  const API_KEY = '$2a$10$ff1X0ElOBiI3CdnVHVhJb./EEXde3B7BJEDtqktwNaAJtgy0BvyM.';
   let people = [];
   let editingId = null;
 
+  // Load from localStorage first for instant display
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) people = JSON.parse(raw);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      people = parsed.students || parsed;
+    }
   } catch (e) { people = []; }
 
+  function saveLocal() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ students: people }));
+  }
+
   function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
+    saveLocal();
+    // Push to cloud (fire and forget, don't block UI)
+    fetch('https://api.jsonbin.io/v3/b/' + BIN_ID, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': API_KEY
+      },
+      body: JSON.stringify({ students: people })
+    }).catch(function() { /* network error, will retry on next save */ });
+  }
+
+  var cloudSyncTimer = null;
+
+  function syncFromCloud() {
+    fetch('https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest', {
+      headers: { 'X-Master-Key': API_KEY }
+    }).then(function(res) {
+      if (!res.ok) throw new Error('fetch failed');
+      return res.json();
+    }).then(function(data) {
+      var remoteStudents = data.record.students || [];
+      if (JSON.stringify(remoteStudents) !== JSON.stringify(people)) {
+        people = remoteStudents;
+        saveLocal();
+        render(searchInput.value);
+        // Reset selection on remote update
+        selectedIds = {};
+        if (selectionMode) {
+          selectionMode = false;
+        }
+      }
+    }).catch(function() { /* network error, try again later */ });
+  }
+
+  function startCloudSync() {
+    syncFromCloud();
+    cloudSyncTimer = setInterval(syncFromCloud, 30000);
   }
 
   const listEl = document.getElementById('list');
@@ -829,6 +876,7 @@
   });
 
   render('');
+  startCloudSync();
 })();
 </script>
 <script>// Load XLSX async so it doesn't block the page
