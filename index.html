@@ -287,7 +287,7 @@
 
 <div class="container">
   <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="搜索姓名、班级、学号、电话、备注...">
+    <input type="text" id="searchInput" placeholder="搜索姓名、班级、当前状态、电话、备注...">
   </div>
 
   <button class="add-btn" id="addBtn">+ 添加学生</button>
@@ -322,8 +322,8 @@
       <input type="text" id="fclass" placeholder="请输入班级">
     </div>
     <div class="form-group">
-      <label>学号</label>
-      <input type="text" id="fstudentId" placeholder="请输入学号">
+      <label>当前状态</label>
+      <input type="text" id="fstudentId" placeholder="请输入当前状态">
     </div>
     <div class="form-group">
       <label>电话</label>
@@ -397,7 +397,7 @@
     listEl.innerHTML = filtered.map(function(p, i) {
       var infoParts = [];
       if (p.class) infoParts.push('<span>班级：' + esc(p.class) + '</span>');
-      if (p.studentId) infoParts.push('<span>学号：' + esc(p.studentId) + '</span>');
+      if (p.studentId) infoParts.push('<span>当前状态：' + esc(p.studentId) + '</span>');
       if (p.phone) infoParts.push('<span>电话：' + esc(p.phone) + '</span>');
       var isSel = selectedIds[p.id] ? ' selected' : '';
 
@@ -496,7 +496,7 @@
       : people;
     if (list.length === 0) { alert('没有数据可导出'); return; }
     var bom = '﻿';
-    var header = ['姓名', '班级', '学号', '电话', '备注'];
+    var header = ['姓名', '班级', '当前状态', '电话', '备注'];
     var rows = [bom + header.map(csvEscape).join(',')];
     list.forEach(function(p) {
       rows.push([p.name, p.class, p.studentId, p.phone, p.notes].map(csvEscape).join(','));
@@ -558,7 +558,7 @@
   var colVariants = {
     name: ['姓名','名字','名称','学生姓名','学生名字','人员姓名','人员','联系人'],
     class: ['班级','班','班组','年级','专业','系别'],
-    studentId: ['学号','编号','工号','序号','ID','id'],
+    studentId: ['学号','当前状态','入党情况','状态','政治面貌','编号'],
     phone: ['电话','手机','手机号','联系方式','联系电话','电话号','号码'],
     notes: ['备注','说明','附注','其他','描述','补充']
   };
