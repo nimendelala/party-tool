@@ -296,7 +296,6 @@
     <button class="btn-backup" id="btnExportJson">备份</button>
     <button class="btn-import" id="btnImport">导入</button>
     <button class="btn-select" id="btnSelect">选择</button>
-    <button class="btn-import" id="btnSettings" style="flex:0.7">设置</button>
   </div>
   <div class="batch-bar" id="batchBar">
     <span class="selected-count" id="selectedCount">已选 0 人</span>
@@ -306,10 +305,7 @@
   </div>
   <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls" style="display:none">
 
-  <div style="display:flex;align-items:center;gap:8px">
-    <div class="people-count" id="peopleCount" style="flex:1;margin-bottom:0"></div>
-    <div class="sync-status" id="syncStatus" style="font-size:11px;color:#aaa">同步中...</div>
-  </div>
+  <div class="people-count" id="peopleCount"></div>
   <div class="list" id="list"></div>
 </div>
 
@@ -342,150 +338,20 @@
       <button class="btn-save" id="btnSave">保存</button>
     </div>
   
-<div class="modal-overlay" id="settingsModal">
-  <div class="modal">
-    <h3>同步设置</h3>
-    <div class="form-group">
-      <label>GitHub Token（用于写入数据）</label>
-      <input type="password" id="ftoken" placeholder="粘贴 GitHub Token">
-      <div style="font-size:12px;color:#999;margin-top:4px">无 Token 时只能查看，不能修改。Token 仅保存在本机。</div>
-    </div>
-    <div class="form-actions">
-      <button class="btn-cancel" id="btnSettingsCancel">取消</button>
-      <button class="btn-save" id="btnSettingsSave">保存</button>
-    </div>
-  </div>
-</div>
-
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
-  const GH_RAW = 'https://raw.githubusercontent.com/nimendelala/party-tool/master/data.json';
-  const GH_API = 'https://api.github.com/repos/nimendelala/party-tool/contents/data.json';
   let people = [];
   let editingId = null;
-  let ghSha = null;
-  let syncing = false;
-  let savePending = false;
-  let ghToken = localStorage.getItem('gh_token') || '';
 
-  function utob(s) { return btoa(unescape(encodeURIComponent(s))); }
-  function btou(s) { return decodeURIComponent(escape(atob(s))); }
-
-  function updateSyncStatus(text, color) {
-    var el = document.getElementById('syncStatus');
-    if (el) { el.textContent = text; el.style.color = color || '#aaa'; }
-  }
-
-  function ghHeaders() {
-    var h = { 'Cache-Control': 'no-cache' };
-    if (ghToken) h['Authorization'] = 'token ' + ghToken;
-    return h;
-  }
-
-  function initData() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) people = JSON.parse(raw);
-    } catch (e) { people = []; }
-    render(searchInput.value);
-
-    fetch(GH_API + '?t=' + Date.now(), { headers: ghHeaders(), cache: 'no-cache' })
-      .then(function(res) {
-        if (!res.ok) throw new Error('API failed');
-        return res.json();
-      })
-      .then(function(data) {
-        var remote = JSON.parse(btou(data.content));
-        if (!Array.isArray(remote)) throw new Error('invalid');
-        ghSha = data.sha;
-        if (remote.length >= people.length) {
-          people = remote;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-          updateSyncStatus('已同步', '#27ae60');
-        } else if (people.length > remote.length) {
-          updateSyncStatus('本地数据更多', '#f39c12');
-          if (ghToken) pushToGitHub();
-        }
-        render(searchInput.value);
-      }).catch(function() {
-        if (people.length > 0) {
-          updateSyncStatus('离线模式', '#e67e22');
-        } else {
-          updateSyncStatus('无数据', '#aaa');
-        }
-      });
-  }
-
-  function pushToGitHub() {
-    if (syncing || !ghToken) return;
-    syncing = true;
-    savePending = false;
-    updateSyncStatus('同步中...', '#aaa');
-    var content = utob(JSON.stringify(people));
-    var body = { message: '更新数据', content: content };
-    if (ghSha) body.sha = ghSha;
-    fetch(GH_API, {
-      method: 'PUT',
-      headers: { 'Authorization': 'token ' + ghToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }).then(function(res) {
-      if (!res.ok) return res.json().then(function(e) { throw new Error(e.message || 'save failed'); });
-      return res.json();
-    }).then(function(data) {
-      ghSha = data.content.sha;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-      updateSyncStatus('已同步', '#27ae60');
-      syncing = false;
-      if (savePending) pushToGitHub();
-    }).catch(function(err) {
-      updateSyncStatus('保存失败: ' + (err.message || ''), '#e74c3c');
-      syncing = false;
-      savePending = true;
-    });
-  }
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) people = JSON.parse(raw);
+  } catch (e) { people = []; }
 
   function save() {
-    // Always save to localStorage first
     localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-    // Debounced push to GitHub
-    savePending = true;
-    if (!syncing && ghToken) {
-      pushToGitHub();
-    } else if (!ghToken) {
-      updateSyncStatus('未配置Token', '#e67e22');
-    }
   }
-
-  // Debounce: check every 2 seconds if there's a pending save
-  setInterval(function() {
-    if (savePending && !syncing && ghToken) {
-      pushToGitHub();
-    }
-  }, 2000);
-
-  // Poll GitHub for remote changes every 20 seconds
-  setInterval(function() {
-    if (syncing || savePending) return;
-    fetch(GH_API + '?t=' + Date.now(), { headers: ghHeaders(), cache: 'no-cache' })
-      .then(function(res) {
-        if (!res.ok) throw new Error('poll failed');
-        return res.json();
-      })
-      .then(function(data) {
-        if (data.sha !== ghSha) {
-          ghSha = data.sha;
-          var remote = JSON.parse(btou(data.content));
-          if (!Array.isArray(remote)) throw new Error('invalid');
-          if (JSON.stringify(remote) !== JSON.stringify(people)) {
-            people = remote;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-            updateSyncStatus('已同步', '#27ae60');
-            render(searchInput.value);
-          }
-        }
-      }).catch(function() {});
-  }, 20000);
 
   const listEl = document.getElementById('list');
   const countEl = document.getElementById('peopleCount');
@@ -912,33 +778,6 @@
     render(searchInput.value);
   });
 
-  // Settings
-  var settingsModal = document.getElementById('settingsModal');
-  var ftoken = document.getElementById('ftoken');
-  document.getElementById('btnSettings').addEventListener('click', function() {
-    ftoken.value = ghToken;
-    settingsModal.classList.add('active');
-  });
-  document.getElementById('btnSettingsCancel').addEventListener('click', function() {
-    settingsModal.classList.remove('active');
-  });
-  document.getElementById('btnSettingsSave').addEventListener('click', function() {
-    ghToken = ftoken.value.trim();
-    localStorage.setItem('gh_token', ghToken);
-    settingsModal.classList.remove('active');
-    if (ghToken) {
-      updateSyncStatus('准备同步...', '#aaa');
-      // Re-fetch SHA
-      fetch(GH_API, { headers: ghHeaders() })
-        .then(function(res) { return res.json(); })
-        .then(function(d) { ghSha = d.sha; updateSyncStatus('已连接', '#27ae60'); })
-        .catch(function() { updateSyncStatus('连接失败', '#e74c3c'); });
-    }
-  });
-  settingsModal.addEventListener('click', function(e) {
-    if (e.target === settingsModal) settingsModal.classList.remove('active');
-  });
-
   btnCancelBatch.addEventListener('click', function() {
     selectionMode = false;
     selectedIds = {};
@@ -989,7 +828,7 @@
     if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
   });
 
-  initData();
+  render('');
 })();
 </script>
 <script>// Load XLSX async so it doesn't block the page
