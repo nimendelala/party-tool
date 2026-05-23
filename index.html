@@ -1153,20 +1153,25 @@
   var installBanner = document.getElementById('installBanner');
   var installBtn = document.getElementById('installBtn');
   var installClose = document.getElementById('installClose');
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
   window.addEventListener('beforeinstallprompt', function(e) {
     e.preventDefault();
     deferredPrompt = e;
-    installBanner.classList.add('show');
+    if (!isStandalone) installBanner.classList.add('show');
   });
 
   installBtn.addEventListener('click', function() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function(choice) {
-      installBanner.classList.remove('show');
-      deferredPrompt = null;
-    });
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choice) {
+        installBanner.classList.remove('show');
+        deferredPrompt = null;
+      });
+    } else {
+      // Fallback: show manual instructions
+      alert('请使用浏览器菜单中的"添加到主屏幕"功能安装此应用。\n\nAndroid Chrome: 右上角 ⋮ → 添加到主屏幕\niPhone Safari: 底部分享按钮 → 添加到主屏幕');
+    }
   });
 
   installClose.addEventListener('click', function() {
@@ -1177,6 +1182,15 @@
     installBanner.classList.remove('show');
     deferredPrompt = null;
   });
+
+  // Fallback: show banner after 5s if browser supports PWA but event hasn't fired
+  if ('serviceWorker' in navigator && !isStandalone) {
+    setTimeout(function() {
+      if (!deferredPrompt && installBanner) {
+        installBanner.classList.add('show');
+      }
+    }, 5000);
+  }
 
   // ====== Task Module ======
   var TASK_STORAGE_KEY = 'task_app_data';

@@ -1,4 +1,4 @@
-var CACHE_NAME = 'party-tool-v1';
+var CACHE_NAME = 'party-tool-v2';
 var ASSETS = [
   '/party-tool/',
   '/party-tool/index.html',
@@ -31,14 +31,27 @@ self.addEventListener('activate', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
-  // Don't cache API calls to jsonbin.io
-  if (e.request.url.indexOf('api.jsonbin.io') !== -1) {
+  if (e.request.url.indexOf('api.jsonbin.io') !== -1) return;
+
+  // For HTML pages: network-first, so updates appear immediately
+  if (e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(e.request, clone);
+        });
+        return response;
+      }).catch(function() {
+        return caches.match(e.request);
+      })
+    );
     return;
   }
 
+  // For other assets: cache-first with background update
   e.respondWith(
     caches.match(e.request).then(function(cached) {
-      // Return cached response immediately, then update cache in background
       var fetched = fetch(e.request).then(function(response) {
         if (response && response.status === 200) {
           var clone = response.clone();
@@ -50,7 +63,6 @@ self.addEventListener('fetch', function(e) {
       }).catch(function() {
         return cached;
       });
-
       return cached || fetched;
     })
   );
