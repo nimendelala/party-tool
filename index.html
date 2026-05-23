@@ -384,16 +384,13 @@
     return h;
   }
 
-  // Init: load from localStorage first (fast), then sync with GitHub
-  (function initData() {
-    // 1. Load localStorage immediately
+  function initData() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) people = JSON.parse(raw);
     } catch (e) { people = []; }
     render(searchInput.value);
 
-    // 2. Try to sync with GitHub in background
     fetch(GH_API + '?t=' + Date.now(), { headers: ghHeaders(), cache: 'no-cache' })
       .then(function(res) {
         if (!res.ok) throw new Error('API failed');
@@ -403,26 +400,23 @@
         var remote = JSON.parse(btou(data.content));
         if (!Array.isArray(remote)) throw new Error('invalid');
         ghSha = data.sha;
-        // Merge: GitHub is source of truth if it has more data
         if (remote.length >= people.length) {
           people = remote;
           localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
           updateSyncStatus('已同步', '#27ae60');
         } else if (people.length > remote.length) {
-          // Local has more data, push to GitHub if we have a token
           updateSyncStatus('本地数据更多', '#f39c12');
           if (ghToken) pushToGitHub();
         }
         render(searchInput.value);
       }).catch(function() {
-        // GitHub unreachable, use localStorage
         if (people.length > 0) {
           updateSyncStatus('离线模式', '#e67e22');
         } else {
           updateSyncStatus('无数据', '#aaa');
         }
       });
-  })();
+  }
 
   function pushToGitHub() {
     if (syncing || !ghToken) return;
@@ -994,7 +988,7 @@
     if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
   });
 
-  render('');
+  initData();
 })();
 </script>
 </body>
