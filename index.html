@@ -570,6 +570,7 @@
   function createSyncEngine(opts) {
     var del = {};
     var timer = null;
+    var lastRemoteIds = {};
 
     function saveLocal() {
       var d = {};
@@ -654,13 +655,30 @@
       }).then(function(data) {
         var remoteArr = data.record[opts.dataKey] || [];
         var arr = opts.getData();
-        var merged = mergeNewer(arr, remoteArr);
+
+        // Build current remote ID set
+        var remoteIds = {};
+        remoteArr.forEach(function(item) { remoteIds[item.id] = true; });
+
+        // Detect deletions: IDs that were in remote last sync but missing now
+        // → someone else deleted them, remove from local too
+        if (Object.keys(lastRemoteIds).length > 0) {
+          Object.keys(lastRemoteIds).forEach(function(id) {
+            if (!remoteIds[id] && !del[id]) {
+              var idx = arr.findIndex(function(item) { return item.id === id; });
+              if (idx !== -1) arr.splice(idx, 1);
+              saveLocal();
+            }
+          });
+        }
+        lastRemoteIds = remoteIds;
+
+        // Merge: remote as base, local overrides for same IDs with newer timestamp
+        var merged = mergeNewer(remoteArr, arr);
         // Filter out items we know we deleted — prevent resurrection
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
         // Clean up del: confirmed-deleted IDs (gone from remote) can be cleared
-        var remoteIds = {};
-        remoteArr.forEach(function(item) { remoteIds[item.id] = true; });
         Object.keys(del).forEach(function(id) {
           if (!remoteIds[id]) delete del[id];
         });
@@ -1300,10 +1318,7 @@
     dataKey: 'tasks',
     getData: function() { return tasks; },
     onRemoteUpdate: function() {
-      var taskView = document.getElementById('view-tasks');
-      if (taskView.classList.contains('active')) {
-        renderTasks(document.getElementById('taskSearchInput').value);
-      }
+      renderTasks(document.getElementById('taskSearchInput').value);
     }
   });
 
