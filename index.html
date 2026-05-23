@@ -275,6 +275,120 @@
   .batch-bar .btn-select-all { background: #e8e8e8; color: #555; }
   .batch-bar .btn-delete-batch { background: #e74c3c; color: #fff; }
   .batch-bar .btn-cancel-batch { background: #e8e8e8; color: #666; }
+
+  /* View switching */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Back button */
+  .back-btn {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    color: #555;
+    cursor: pointer;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .back-btn:active { background: #f0f0f0; }
+
+  /* Home page */
+  .home-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  .home-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 36px 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    border: 2px solid transparent;
+  }
+  .home-card:active { transform: scale(0.97); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .home-card .card-icon { font-size: 48px; margin-bottom: 12px; }
+  .home-card .card-title { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 6px; }
+  .home-card .card-subtitle { font-size: 13px; color: #999; }
+  .home-card.card-students { border-color: #c0392b; }
+  .home-card.card-tasks { border-color: #2980b9; }
+
+  /* Task list */
+  .task-count {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 8px;
+  }
+  .task-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: transform 0.1s;
+  }
+  .task-card:active { transform: scale(0.98); }
+  .task-card .task-check {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .task-card.completed .task-check {
+    background: #27ae60;
+    border-color: #27ae60;
+  }
+  .task-card.completed .task-check::after {
+    content: '';
+    width: 6px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translateY(-1px);
+  }
+  .task-card .task-body { flex: 1; min-width: 0; }
+  .task-card .task-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .task-card.completed .task-title {
+    text-decoration: line-through;
+    color: #999;
+  }
+  .task-card .task-notes {
+    font-size: 13px;
+    color: #888;
+    word-break: break-word;
+  }
+  .task-card.completed .task-notes { color: #bbb; }
+  .task-card .task-delete {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .task-card .task-delete:active { color: #e74c3c; }
 </style>
 </head>
 <body>
@@ -285,28 +399,58 @@
   </div>
 
 <div class="container">
-  <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="搜索姓名、班级、当前状态、电话、备注...">
+
+  <!-- ====== Home View ====== -->
+  <div id="view-home" class="view active">
+    <div class="home-cards">
+      <div class="home-card card-students" id="navStudents">
+        <div class="card-icon">👥</div>
+        <div class="card-title">学生信息管理</div>
+        <div class="card-subtitle">管理学生通讯录与状态信息</div>
+      </div>
+      <div class="home-card card-tasks" id="navTasks">
+        <div class="card-icon">📋</div>
+        <div class="card-title">工作列表</div>
+        <div class="card-subtitle">查看和管理待办工作任务</div>
+      </div>
+    </div>
   </div>
 
-  <button class="add-btn" id="addBtn">+ 添加学生</button>
-
-  <div class="toolbar">
-    <button class="btn-export" id="btnExportCsv">导出 Excel</button>
-    <button class="btn-backup" id="btnExportJson">备份</button>
-    <button class="btn-import" id="btnImport">导入</button>
-    <button class="btn-select" id="btnSelect">选择</button>
+  <!-- ====== Students View ====== -->
+  <div id="view-students" class="view">
+    <button class="back-btn" id="backFromStudents">← 返回首页</button>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="搜索姓名、班级、当前状态、电话、备注...">
+    </div>
+    <button class="add-btn" id="addBtn">+ 添加学生</button>
+    <div class="toolbar">
+      <button class="btn-export" id="btnExportCsv">导出 Excel</button>
+      <button class="btn-backup" id="btnExportJson">备份</button>
+      <button class="btn-import" id="btnImport">导入</button>
+      <button class="btn-select" id="btnSelect">选择</button>
+    </div>
+    <div class="batch-bar" id="batchBar">
+      <span class="selected-count" id="selectedCount">已选 0 人</span>
+      <button class="btn-select-all" id="btnSelectAll">全选</button>
+      <button class="btn-delete-batch" id="btnDeleteBatch">删除</button>
+      <button class="btn-cancel-batch" id="btnCancelBatch">取消</button>
+    </div>
+    <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls" style="display:none">
+    <div class="people-count" id="peopleCount"></div>
+    <div class="list" id="list"></div>
   </div>
-  <div class="batch-bar" id="batchBar">
-    <span class="selected-count" id="selectedCount">已选 0 人</span>
-    <button class="btn-select-all" id="btnSelectAll">全选</button>
-    <button class="btn-delete-batch" id="btnDeleteBatch">删除</button>
-    <button class="btn-cancel-batch" id="btnCancelBatch">取消</button>
-  </div>
-  <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls" style="display:none">
 
-  <div class="people-count" id="peopleCount"></div>
-  <div class="list" id="list"></div>
+  <!-- ====== Tasks View ====== -->
+  <div id="view-tasks" class="view">
+    <button class="back-btn" id="backFromTasks">← 返回首页</button>
+    <div class="search-bar">
+      <input type="text" id="taskSearchInput" placeholder="搜索任务标题、备注...">
+    </div>
+    <button class="add-btn" id="taskAddBtn">+ 添加任务</button>
+    <div class="task-count" id="taskCount"></div>
+    <div class="list" id="taskList"></div>
+  </div>
+
 </div>
 
 <div class="modal-overlay" id="modal">
@@ -337,12 +481,34 @@
       <button class="btn-delete" id="btnDelete" style="display:none">删除</button>
       <button class="btn-save" id="btnSave">保存</button>
     </div>
-  
+  </div>
+</div>
+
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <h3 id="taskModalTitle">添加任务</h3>
+    <div class="form-group">
+      <label>任务名称 *</label>
+      <input type="text" id="ftaskTitle" placeholder="请输入任务名称">
+    </div>
+    <div class="form-group">
+      <label>备注</label>
+      <textarea id="ftaskNotes" placeholder="请输入备注信息（可选）"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="btnTaskCancel">取消</button>
+      <button class="btn-delete" id="btnTaskDelete" style="display:none">删除</button>
+      <button class="btn-save" id="btnTaskSave">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
   const BIN_ID = '6a120bb6ee5a733b120afb8a';
   const API_KEY = '$2a$10$ff1X0ElOBiI3CdnVHVhJb./EEXde3B7BJEDtqktwNaAJtgy0BvyM.';
+  const TASK_BIN_ID = '6a1211c36610dd3ae8947a52';
   let people = [];
   let editingId = null;
   var deletedIds = {};
@@ -897,11 +1063,270 @@
   });
 
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
+    if (e.key === 'Escape') {
+      if (taskModal && taskModal.classList.contains('active')) {
+        closeTaskModal();
+      } else if (modal.classList.contains('active')) {
+        closeModal();
+      }
+    }
   });
 
-  render('');
+  // ====== View Switching ======
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(function(v) {
+      v.classList.remove('active');
+    });
+    var target = document.getElementById('view-' + name);
+    if (target) target.classList.add('active');
+  }
+
+  // Navigation handlers
+  document.getElementById('navStudents').addEventListener('click', function() {
+    showView('students');
+    render(searchInput.value);
+  });
+  document.getElementById('navTasks').addEventListener('click', function() {
+    showView('tasks');
+    renderTasks(taskSearchInput.value);
+  });
+  document.getElementById('backFromStudents').addEventListener('click', function() {
+    showView('home');
+  });
+  document.getElementById('backFromTasks').addEventListener('click', function() {
+    showView('home');
+  });
+
+  // ====== Task Module ======
+  var TASK_STORAGE_KEY = 'task_app_data';
+  var tasks = [];
+  var taskEditingId = null;
+  var taskDeletedIds = {};
+
+  try {
+    var taskRaw = localStorage.getItem(TASK_STORAGE_KEY);
+    if (taskRaw) {
+      var taskParsed = JSON.parse(taskRaw);
+      tasks = taskParsed.tasks || [];
+    }
+  } catch (e) { tasks = []; }
+
+  function saveTasksLocal() {
+    localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify({ tasks: tasks }));
+  }
+
+  function saveTasks() {
+    saveTasksLocal();
+    fetch('https://api.jsonbin.io/v3/b/' + TASK_BIN_ID + '/latest', {
+      headers: { 'X-Master-Key': API_KEY }
+    }).then(function(res) {
+      if (!res.ok) throw new Error('fetch failed');
+      return res.json();
+    }).then(function(data) {
+      var remote = data.record.tasks || [];
+      var merged = {};
+      remote.forEach(function(t) { merged[t.id] = t; });
+      tasks.forEach(function(t) { merged[t.id] = t; });
+      Object.keys(taskDeletedIds).forEach(function(id) { delete merged[id]; });
+      var result = Object.keys(merged).map(function(id) { return merged[id]; });
+      return fetch('https://api.jsonbin.io/v3/b/' + TASK_BIN_ID, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': API_KEY
+        },
+        body: JSON.stringify({ tasks: result })
+      });
+    }).then(function() {
+      taskDeletedIds = {};
+    }).catch(function() { /* network error, keep deletedIds for retry */ });
+  }
+
+  var taskCloudSyncTimer = null;
+
+  function syncTasksFromCloud() {
+    fetch('https://api.jsonbin.io/v3/b/' + TASK_BIN_ID + '/latest', {
+      headers: { 'X-Master-Key': API_KEY }
+    }).then(function(res) {
+      if (!res.ok) throw new Error('fetch failed');
+      return res.json();
+    }).then(function(data) {
+      var remoteTasks = data.record.tasks || [];
+      if (JSON.stringify(remoteTasks) !== JSON.stringify(tasks)) {
+        tasks = remoteTasks;
+        taskDeletedIds = {};
+        saveTasksLocal();
+        var taskView = document.getElementById('view-tasks');
+        if (taskView.classList.contains('active')) {
+          renderTasks(document.getElementById('taskSearchInput').value);
+        }
+      }
+    }).catch(function() { /* network error, try again later */ });
+  }
+
+  function startTaskCloudSync() {
+    syncTasksFromCloud();
+    taskCloudSyncTimer = setInterval(syncTasksFromCloud, 30000);
+  }
+
+  // Task render
+  var taskListEl = document.getElementById('taskList');
+  var taskCountEl = document.getElementById('taskCount');
+  var taskSearchInput = document.getElementById('taskSearchInput');
+
+  function renderTasks(filter) {
+    var q = (filter || '').toLowerCase().trim();
+    var filtered = q
+      ? tasks.filter(function(t) {
+          return (t.title || '').toLowerCase().indexOf(q) !== -1
+            || (t.notes || '').toLowerCase().indexOf(q) !== -1;
+        })
+      : tasks.slice();
+
+    filtered.sort(function(a, b) {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+
+    var completedCount = filtered.filter(function(t) { return t.completed; }).length;
+    taskCountEl.textContent = '共 ' + filtered.length + ' 项任务'
+      + (completedCount > 0 ? '（已完成 ' + completedCount + ' 项）' : '')
+      + (q ? '（搜索结果）' : '');
+
+    if (filtered.length === 0) {
+      taskListEl.innerHTML = '<div class="empty"><div class="icon">📋</div>还没有任务，点击上方按钮添加</div>';
+      return;
+    }
+
+    taskListEl.innerHTML = filtered.map(function(t) {
+      var completedClass = t.completed ? ' completed' : '';
+      return '<div class="task-card' + completedClass + '" data-id="' + t.id + '">'
+        + '<div class="task-check" data-action="toggle"></div>'
+        + '<div class="task-body" data-action="edit">'
+        + '<div class="task-title">' + esc(t.title || '(未命名)') + '</div>'
+        + (t.notes ? '<div class="task-notes">' + esc(t.notes) + '</div>' : '')
+        + '</div>'
+        + '<button class="task-delete" data-action="delete" title="删除任务">×</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Task CRUD
+  var taskModal = document.getElementById('taskModal');
+  var taskModalTitle = document.getElementById('taskModalTitle');
+  var ftaskTitle = document.getElementById('ftaskTitle');
+  var ftaskNotes = document.getElementById('ftaskNotes');
+  var btnTaskSave = document.getElementById('btnTaskSave');
+  var btnTaskCancel = document.getElementById('btnTaskCancel');
+  var btnTaskDelete = document.getElementById('btnTaskDelete');
+
+  function openTaskModal(task) {
+    taskEditingId = task ? task.id : null;
+    taskModalTitle.textContent = task ? '编辑任务' : '添加任务';
+    ftaskTitle.value = task ? task.title : '';
+    ftaskNotes.value = task ? task.notes : '';
+    btnTaskDelete.style.display = task ? '' : 'none';
+    taskModal.classList.add('active');
+    ftaskTitle.focus();
+  }
+
+  function closeTaskModal() {
+    taskModal.classList.remove('active');
+    taskEditingId = null;
+  }
+
+  function saveTask() {
+    var title = ftaskTitle.value.trim();
+    if (!title) { alert('请至少填写任务名称'); return; }
+
+    var existing = taskEditingId ? tasks.find(function(t) { return t.id === taskEditingId; }) : null;
+    var data = {
+      id: taskEditingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      title: title,
+      notes: ftaskNotes.value.trim(),
+      completed: existing ? existing.completed : false,
+      createdAt: existing ? existing.createdAt : new Date().toISOString()
+    };
+
+    if (taskEditingId) {
+      var idx = tasks.findIndex(function(t) { return t.id === taskEditingId; });
+      if (idx !== -1) tasks[idx] = data;
+    } else {
+      tasks.push(data);
+    }
+
+    saveTasks();
+    closeTaskModal();
+    renderTasks(taskSearchInput.value);
+  }
+
+  function deleteTask() {
+    if (!taskEditingId) return;
+    if (!confirm('确定删除该任务吗？')) return;
+    tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
+    taskDeletedIds[taskEditingId] = true;
+    saveTasks();
+    closeTaskModal();
+    renderTasks(taskSearchInput.value);
+  }
+
+  function toggleTaskComplete(id) {
+    var task = tasks.find(function(t) { return t.id === id; });
+    if (task) {
+      task.completed = !task.completed;
+      saveTasks();
+      renderTasks(taskSearchInput.value);
+    }
+  }
+
+  // Task event listeners
+  document.getElementById('taskAddBtn').addEventListener('click', function() {
+    openTaskModal(null);
+  });
+  btnTaskCancel.addEventListener('click', closeTaskModal);
+  btnTaskSave.addEventListener('click', saveTask);
+  btnTaskDelete.addEventListener('click', deleteTask);
+  taskModal.addEventListener('click', function(e) {
+    if (e.target === taskModal) closeTaskModal();
+  });
+  taskSearchInput.addEventListener('input', function() {
+    renderTasks(this.value);
+  });
+  taskListEl.addEventListener('click', function(e) {
+    var actionEl = e.target.closest('[data-action]');
+    var card = e.target.closest('.task-card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+
+    if (actionEl) {
+      var action = actionEl.getAttribute('data-action');
+      if (action === 'toggle') {
+        toggleTaskComplete(id);
+        return;
+      }
+      if (action === 'delete') {
+        if (!confirm('确定删除该任务吗？')) return;
+        tasks = tasks.filter(function(t) { return t.id !== id; });
+        taskDeletedIds[id] = true;
+        saveTasks();
+        renderTasks(taskSearchInput.value);
+        return;
+      }
+      if (action === 'edit') {
+        var t = tasks.find(function(t) { return t.id === id; });
+        if (t) openTaskModal(t);
+        return;
+      }
+    }
+
+    var t = tasks.find(function(t) { return t.id === id; });
+    if (t) openTaskModal(t);
+  });
+
+  // ====== Init ======
+  showView('home');
   startCloudSync();
+  startTaskCloudSync();
 })();
 </script>
 <script>// Load XLSX async so it doesn't block the page
