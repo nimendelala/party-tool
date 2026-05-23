@@ -395,6 +395,11 @@
     color: #888;
     word-break: break-word;
   }
+  .task-card .task-date {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 4px;
+  }
   .task-card.completed .task-notes { color: #bbb; }
   .task-card .task-delete {
     background: none;
@@ -524,6 +529,10 @@
     <div class="form-group">
       <label>任务名称 *</label>
       <input type="text" id="ftaskTitle" placeholder="请输入任务名称">
+    </div>
+    <div class="form-group">
+      <label>工作时间</label>
+      <input type="date" id="ftaskDate">
     </div>
     <div class="form-group">
       <label>备注</label>
@@ -1253,6 +1262,7 @@
     var filtered = q
       ? tasks.filter(function(t) {
           return (t.title || '').toLowerCase().indexOf(q) !== -1
+            || (t.workDate || '').toLowerCase().indexOf(q) !== -1
             || (t.notes || '').toLowerCase().indexOf(q) !== -1;
         })
       : tasks.slice();
@@ -1278,6 +1288,7 @@
         + '<div class="task-check" data-action="toggle"></div>'
         + '<div class="task-body" data-action="edit">'
         + '<div class="task-title">' + esc(t.title || '(未命名)') + '</div>'
+        + (t.workDate ? '<div class="task-date">' + esc(t.workDate) + '</div>' : '')
         + (t.notes ? '<div class="task-notes">' + esc(t.notes) + '</div>' : '')
         + '</div>'
         + '<button class="task-delete" data-action="delete" title="删除任务">×</button>'
@@ -1289,6 +1300,7 @@
   var taskModal = document.getElementById('taskModal');
   var taskModalTitle = document.getElementById('taskModalTitle');
   var ftaskTitle = document.getElementById('ftaskTitle');
+  var ftaskDate = document.getElementById('ftaskDate');
   var ftaskNotes = document.getElementById('ftaskNotes');
   var btnTaskSave = document.getElementById('btnTaskSave');
   var btnTaskCancel = document.getElementById('btnTaskCancel');
@@ -1298,6 +1310,7 @@
     taskEditingId = task ? task.id : null;
     taskModalTitle.textContent = task ? '编辑任务' : '添加任务';
     ftaskTitle.value = task ? task.title : '';
+    ftaskDate.value = task ? (task.workDate || '') : '';
     ftaskNotes.value = task ? task.notes : '';
     btnTaskDelete.style.display = task ? '' : 'none';
     taskModal.classList.add('active');
@@ -1317,6 +1330,7 @@
     var data = {
       id: taskEditingId || genId(),
       title: title,
+      workDate: ftaskDate.value,
       notes: ftaskNotes.value.trim(),
       completed: existing ? existing.completed : false,
       createdAt: existing ? existing.createdAt : new Date().toISOString()
