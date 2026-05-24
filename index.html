@@ -594,13 +594,20 @@
 
   // Generic sync engine — shared by students and tasks
   function createSyncEngine(opts) {
+    var DEL_KEY = opts.storageKey + '_del';
     var del = {};
     var timer = null;
+    // Restore persisted deletion list
+    try {
+      var rawDel = localStorage.getItem(DEL_KEY);
+      if (rawDel) del = JSON.parse(rawDel);
+    } catch(e) {}
 
     function saveLocal() {
       var d = {};
       d[opts.dataKey] = opts.getData();
       localStorage.setItem(opts.storageKey, JSON.stringify(d));
+      localStorage.setItem(DEL_KEY, JSON.stringify(del));
     }
 
     function mergeNewer(base, incoming) {
@@ -665,9 +672,11 @@
         // Only clear deletions that remote confirms are gone
         var remoteIds = {};
         remote.forEach(function(item) { remoteIds[item.id] = true; });
+        var delChanged2 = false;
         Object.keys(del).forEach(function(id) {
-          if (!remoteIds[id]) delete del[id];
+          if (!remoteIds[id]) { delete del[id]; delChanged2 = true; }
         });
+        if (delChanged2) saveLocal();
         if (opts.onStatus) opts.onStatus('updated');
       }).catch(function() {
         if (opts.onStatus) opts.onStatus('err');
@@ -709,8 +718,9 @@
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
         // Clean up del: confirmed-deleted IDs can be cleared
+        var delChanged = false;
         Object.keys(del).forEach(function(id) {
-          if (!remoteIds[id]) delete del[id];
+          if (!remoteIds[id]) { delete del[id]; delChanged = true; }
         });
         if (JSON.stringify(result) !== JSON.stringify(arr)) {
           arr.length = 0;
@@ -719,6 +729,7 @@
           opts.onRemoteUpdate();
           if (opts.onStatus) opts.onStatus('updated');
         } else {
+          if (delChanged) saveLocal();
           if (opts.onStatus) opts.onStatus('ok');
         }
       }).catch(function() {
