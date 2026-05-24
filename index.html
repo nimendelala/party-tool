@@ -294,6 +294,30 @@
   }
   .batch-edit-field-btn:active { background: #f0f0f0; }
 
+  /* Sync status */
+  #syncStatus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #999;
+    background: #fafafa;
+    transition: all 0.3s;
+  }
+  #syncStatus .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ccc;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  #syncStatus.ok { color: #27ae60; background: #f0faf4; }
+  #syncStatus.ok .dot { background: #27ae60; }
+  #syncStatus.err { color: #e74c3c; background: #fef5f5; }
+  #syncStatus.err .dot { background: #e74c3c; }
+
   /* View switching */
   .view { display: none; }
   .view.active { display: block; }
@@ -422,6 +446,8 @@
     体育系党支部工具箱
   </div>
 
+
+<div id="syncStatus"><span class="dot"></span><span id="syncStatusText">检查连接...</span></div>
 
 <div class="container">
 
@@ -642,7 +668,10 @@
         Object.keys(del).forEach(function(id) {
           if (!remoteIds[id]) delete del[id];
         });
-      }).catch(function() {});
+        if (opts.onStatus) opts.onStatus('ok');
+      }).catch(function() {
+        if (opts.onStatus) opts.onStatus('err');
+      });
     }
 
     function sync() {
@@ -689,7 +718,10 @@
           saveLocal();
           opts.onRemoteUpdate();
         }
-      }).catch(function() {});
+        if (opts.onStatus) opts.onStatus('ok');
+      }).catch(function() {
+        if (opts.onStatus) opts.onStatus('err');
+      });
     }
 
     return {
@@ -701,11 +733,34 @@
     };
   }
 
+  // Sync status indicator
+  var syncStatus = { students: null, tasks: null };
+  var syncStatusEl = document.getElementById('syncStatus');
+  var syncStatusText = document.getElementById('syncStatusText');
+
+  function updateSyncUI() {
+    if (syncStatus.students === 'err' || syncStatus.tasks === 'err') {
+      syncStatusEl.className = 'err';
+      syncStatusText.textContent = '同步失败，请检查网络';
+    } else if (syncStatus.students === 'ok' && syncStatus.tasks === 'ok') {
+      syncStatusEl.className = 'ok';
+      syncStatusText.textContent = '已同步 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+    }
+  }
+
+  function makeOnStatus(key) {
+    return function(state) {
+      syncStatus[key] = state;
+      updateSyncUI();
+    };
+  }
+
   var engine = createSyncEngine({
     binId: BIN_ID,
     storageKey: STORAGE_KEY,
     dataKey: 'students',
     getData: function() { return people; },
+    onStatus: makeOnStatus('students'),
     onRemoteUpdate: function() {
       render(searchInput.value);
       selectedIds = {};
@@ -1318,6 +1373,7 @@
     storageKey: TASK_STORAGE_KEY,
     dataKey: 'tasks',
     getData: function() { return tasks; },
+    onStatus: makeOnStatus('tasks'),
     onRemoteUpdate: function() {
       renderTasks(document.getElementById('taskSearchInput').value);
     }
