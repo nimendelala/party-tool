@@ -610,18 +610,22 @@
       localStorage.setItem(DEL_KEY, JSON.stringify(del));
     }
 
-    function mergeNewer(base, incoming) {
-      var result = {};
-      base.forEach(function(item) { result[item.id] = item; });
-      incoming.forEach(function(item) {
-        var exist = result[item.id];
-        if (!exist) { result[item.id] = item; return; }
-        // Keep whichever has the newer updatedAt; incoming wins ties
-        var existTs = exist.updatedAt || '';
-        var itemTs = item.updatedAt || '';
-        if (itemTs >= existTs) result[item.id] = item;
+    // Merge local into remote. Remote is authoritative for deletions:
+    // local-only items older than 30s are dropped (considered deleted remotely).
+    function mergeSave(remoteArr, localArr) {
+      var now = Date.now();
+      var merged = {};
+      remoteArr.forEach(function(item) { merged[item.id] = item; });
+      localArr.forEach(function(item) {
+        var exist = merged[item.id];
+        if (exist) {
+          if ((item.updatedAt || '') >= (exist.updatedAt || '')) merged[item.id] = item;
+        } else {
+          var age = now - new Date(item.updatedAt || 0).getTime();
+          if (age < 30000) merged[item.id] = item;
+        }
       });
-      return result;
+      return merged;
     }
 
     function noCacheUrl(base) {
@@ -638,7 +642,7 @@
       }).then(function(data) {
         var remote = data.record[opts.dataKey] || [];
         var arr = opts.getData();
-        var merged = mergeNewer(remote, arr);
+        var merged = mergeSave(remote, arr);
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
         var body = {};
@@ -659,7 +663,7 @@
       }).then(function(data) {
         var remote = data.record[opts.dataKey] || [];
         var arr = opts.getData();
-        var merged = mergeNewer(remote, arr);
+        var merged = mergeSave(remote, arr);
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
         // Update local if post-PUT merge differs (picked up concurrent edits)
@@ -692,28 +696,10 @@
       }).then(function(data) {
         var remoteArr = data.record[opts.dataKey] || [];
         var arr = opts.getData();
-        var now = Date.now();
         var remoteIds = {};
         remoteArr.forEach(function(item) { remoteIds[item.id] = true; });
 
-        var merged = {};
-        // Remote is authoritative: all remote items go in
-        remoteArr.forEach(function(item) { merged[item.id] = item; });
-        // For local items: keep if in remote (timestamp compare) or very new (unsaved creation)
-        arr.forEach(function(item) {
-          var exist = merged[item.id];
-          if (exist) {
-            // In both — keep newer timestamp
-            var existTs = exist.updatedAt || '';
-            var itemTs = item.updatedAt || '';
-            if (itemTs >= existTs) merged[item.id] = item;
-          } else {
-            // Only in local — keep only if very recent (unsaved creation, < 30s old)
-            var age = now - new Date(item.updatedAt || 0).getTime();
-            if (age < 30000) merged[item.id] = item;
-            // Otherwise: item was deleted from remote → drop it
-          }
-        });
+        var merged = mergeSave(remoteArr, arr);
         // Remove items we queued for deletion
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
