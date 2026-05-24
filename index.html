@@ -668,7 +668,7 @@
         Object.keys(del).forEach(function(id) {
           if (!remoteIds[id]) delete del[id];
         });
-        if (opts.onStatus) opts.onStatus('ok');
+        if (opts.onStatus) opts.onStatus('updated');
       }).catch(function() {
         if (opts.onStatus) opts.onStatus('err');
       });
@@ -717,8 +717,10 @@
           result.forEach(function(item) { arr.push(item); });
           saveLocal();
           opts.onRemoteUpdate();
+          if (opts.onStatus) opts.onStatus('updated');
+        } else {
+          if (opts.onStatus) opts.onStatus('ok');
         }
-        if (opts.onStatus) opts.onStatus('ok');
       }).catch(function() {
         if (opts.onStatus) opts.onStatus('err');
       });
@@ -734,17 +736,21 @@
   }
 
   // Sync status indicator
-  var syncStatus = { students: null, tasks: null };
+  var syncStatus = { students: 'init', tasks: 'init' };
   var syncStatusEl = document.getElementById('syncStatus');
   var syncStatusText = document.getElementById('syncStatusText');
 
   function updateSyncUI() {
-    if (syncStatus.students === 'err' || syncStatus.tasks === 'err') {
+    var s1 = syncStatus.students, s2 = syncStatus.tasks;
+    if (s1 === 'err' || s2 === 'err') {
       syncStatusEl.className = 'err';
       syncStatusText.textContent = '同步失败，请检查网络';
-    } else if (syncStatus.students === 'ok' && syncStatus.tasks === 'ok') {
+    } else if (s1 === 'updated' || s2 === 'updated') {
       syncStatusEl.className = 'ok';
-      syncStatusText.textContent = '已同步 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+      syncStatusText.textContent = '已更新 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+    } else if (s1 === 'ok' && s2 === 'ok') {
+      syncStatusEl.className = 'ok';
+      syncStatusText.textContent = '已连接';
     }
   }
 
