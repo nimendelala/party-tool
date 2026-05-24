@@ -737,10 +737,18 @@
       });
     }
 
+    var saveTimer = null;
+    function debouncedSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveLocal();
+      saveTimer = setTimeout(function() { save(); }, 500);
+    }
+
     return {
       get deletedIds() { return del; },
       set deletedIds(v) { del = v; },
       save: save,
+      debouncedSave: debouncedSave,
       sync: sync,
       startSync: function() { sync(); timer = setInterval(sync, 10000); }
     };
@@ -1508,7 +1516,7 @@
     if (task) {
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      taskEngine.save();
+      taskEngine.debouncedSave();
       renderTasks(taskSearchInput.value);
     }
   }
