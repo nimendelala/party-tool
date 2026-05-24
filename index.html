@@ -773,9 +773,17 @@
     getData: function() { return people; },
     onStatus: makeOnStatus('students'),
     onRemoteUpdate: function() {
+      var existingIds = {};
+      people.forEach(function(p) { existingIds[p.id] = true; });
+      var changed = false;
+      Object.keys(selectedIds).forEach(function(id) {
+        if (!existingIds[id]) { delete selectedIds[id]; changed = true; }
+      });
+      if (Object.keys(selectedIds).length === 0 && selectionMode) {
+        selectionMode = false;
+        changed = true;
+      }
       render(searchInput.value);
-      selectedIds = {};
-      if (selectionMode) selectionMode = false;
     }
   });
 
@@ -796,6 +804,7 @@
 
   let selectionMode = false;
   let selectedIds = {};
+  let filteredPeople = [];
 
   function render(filter) {
     const q = (filter || '').toLowerCase().trim();
@@ -808,6 +817,8 @@
             || (p.notes || '').toLowerCase().indexOf(q) !== -1;
         })
       : people;
+
+    filteredPeople = filtered;
 
     countEl.textContent = '共 ' + filtered.length + ' 人' + (q ? '（搜索结果）' : '');
 
@@ -952,7 +963,8 @@
     var added = 0;
     var existIds = {};
     people.forEach(function(p) { existIds[p.id] = true; });
-    imported.forEach(function(p) {
+    imported.forEach(function(p, i) {
+      if (!p.id) p.id = genId() + i;
       if (!existIds[p.id]) {
         p.updatedAt = new Date().toISOString();
         people.push(p);
@@ -1181,9 +1193,10 @@
     btnSelect.classList.add('active');
     btnSelect.textContent = '取消选择';
     var count = Object.keys(selectedIds).length;
-    var total = people.length;
+    var visibleIds = filteredPeople.map(function(p) { return p.id; });
+    var allVisibleSelected = visibleIds.every(function(id) { return selectedIds[id]; });
     selectedCountEl.textContent = '已选 ' + count + ' 人';
-    btnSelectAll.textContent = count === total ? '取消全选' : '全选';
+    btnSelectAll.textContent = allVisibleSelected ? '取消全选' : '全选';
   }
 
   btnSelect.addEventListener('click', function() {
@@ -1199,12 +1212,12 @@
   });
 
   btnSelectAll.addEventListener('click', function() {
-    var allSelected = Object.keys(selectedIds).length === people.length;
-    if (allSelected) {
-      selectedIds = {};
+    var ids = filteredPeople.map(function(p) { return p.id; });
+    var allVisibleSelected = ids.every(function(id) { return selectedIds[id]; });
+    if (allVisibleSelected) {
+      ids.forEach(function(id) { delete selectedIds[id]; });
     } else {
-      selectedIds = {};
-      people.forEach(function(p) { selectedIds[p.id] = true; });
+      ids.forEach(function(id) { selectedIds[id] = true; });
     }
     render(searchInput.value);
   });
