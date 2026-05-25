@@ -597,21 +597,32 @@
     var DEL_KEY = opts.storageKey + '_del';
     var del = {};
     var timer = null;
+    var unsavedIds = {};
     // Restore persisted deletion list
     try {
       var rawDel = localStorage.getItem(DEL_KEY);
       if (rawDel) del = JSON.parse(rawDel);
     } catch(e) {}
+    // Restore unsaved IDs (items never confirmed on server)
+    try {
+      var rawData = localStorage.getItem(opts.storageKey);
+      if (rawData) {
+        var parsed = JSON.parse(rawData);
+        if (parsed._unsaved) unsavedIds = parsed._unsaved;
+      }
+    } catch(e) {}
 
     function saveLocal() {
       var d = {};
       d[opts.dataKey] = opts.getData();
+      d._unsaved = unsavedIds;
       localStorage.setItem(opts.storageKey, JSON.stringify(d));
       localStorage.setItem(DEL_KEY, JSON.stringify(del));
     }
 
     // Merge local into remote. Remote is authoritative for deletions:
-    // local-only items older than 30s are dropped (considered deleted remotely).
+    // local-only items older than 30s are dropped (considered deleted remotely),
+    // EXCEPT items never confirmed on server (tracked in unsavedIds).
     function mergeSave(remoteArr, localArr) {
       var now = Date.now();
       var merged = {};
@@ -622,7 +633,7 @@
           if ((item.updatedAt || '') >= (exist.updatedAt || '')) merged[item.id] = item;
         } else {
           var age = now - new Date(item.updatedAt || 0).getTime();
-          if (age < 30000) merged[item.id] = item;
+          if (age < 30000 || unsavedIds[item.id]) merged[item.id] = item;
         }
       });
       return merged;
@@ -633,6 +644,8 @@
     }
 
     function save() {
+      var arr = opts.getData();
+      arr.forEach(function(item) { unsavedIds[item.id] = true; });
       saveLocal();
       fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
         headers: { 'X-Master-Key': API_KEY }
@@ -666,13 +679,16 @@
         var merged = mergeSave(remote, arr);
         Object.keys(del).forEach(function(id) { delete merged[id]; });
         var result = Object.keys(merged).map(function(id) { return merged[id]; });
-        // Update local if post-PUT merge differs (picked up concurrent edits)
-        if (JSON.stringify(result) !== JSON.stringify(arr)) {
+        var changed = JSON.stringify(result) !== JSON.stringify(arr);
+        if (changed) {
           arr.length = 0;
           result.forEach(function(item) { arr.push(item); });
-          saveLocal();
-          opts.onRemoteUpdate();
         }
+        // Clear unsavedIds for items confirmed on remote, and for deleted items
+        remote.forEach(function(item) { delete unsavedIds[item.id]; });
+        Object.keys(del).forEach(function(id) { delete unsavedIds[id]; });
+        saveLocal();
+        if (changed) opts.onRemoteUpdate();
         // Only clear deletions that remote confirms are gone
         var remoteIds = {};
         remote.forEach(function(item) { remoteIds[item.id] = true; });
@@ -708,6 +724,9 @@
         Object.keys(del).forEach(function(id) {
           if (!remoteIds[id]) { delete del[id]; delChanged = true; }
         });
+        // Clear unsavedIds for items now on remote
+        remoteArr.forEach(function(item) { delete unsavedIds[item.id]; });
+        Object.keys(del).forEach(function(id) { delete unsavedIds[id]; });
         if (JSON.stringify(result) !== JSON.stringify(arr)) {
           arr.length = 0;
           result.forEach(function(item) { arr.push(item); });
@@ -736,7 +755,7 @@
       save: save,
       debouncedSave: debouncedSave,
       sync: sync,
-      startSync: function() { sync(); timer = setInterval(sync, 10000); }
+      startSync: function() { sync(); timer = setInterval(sync, 5000); }
     };
   }
 
