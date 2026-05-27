@@ -294,30 +294,6 @@
   }
   .batch-edit-field-btn:active { background: #f0f0f0; }
 
-  /* Sync status */
-  #syncStatus {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 4px 12px;
-    font-size: 11px;
-    color: #999;
-    background: #fafafa;
-    transition: all 0.3s;
-  }
-  #syncStatus .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #ccc;
-    flex-shrink: 0;
-    transition: background 0.3s;
-  }
-  #syncStatus.ok { color: #27ae60; background: #f0faf4; }
-  #syncStatus.ok .dot { background: #27ae60; }
-  #syncStatus.err { color: #e74c3c; background: #fef5f5; }
-  #syncStatus.err .dot { background: #e74c3c; }
-
   /* View switching */
   .view { display: none; }
   .view.active { display: block; }
@@ -447,7 +423,7 @@
   </div>
 
 
-<div id="syncStatus"><span class="dot"></span><span id="syncStatusText">检查连接...</span></div>
+
 
 <div class="container">
 
@@ -577,13 +553,10 @@
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
-  const BIN_ID = '6a120bb6ee5a733b120afb8a';
-  const API_KEY = '$2a$10$ff1X0ElOBiI3CdnVHVhJb./EEXde3B7BJEDtqktwNaAJtgy0BvyM.';
-  const TASK_BIN_ID = '6a1211c36610dd3ae8947a52';
   let people = [];
   let editingId = null;
 
-  // Load from localStorage first for instant display
+  // Load from localStorage
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -592,218 +565,26 @@
     }
   } catch (e) { people = []; }
 
-  // Generic sync engine — shared by students and tasks
-  function createSyncEngine(opts) {
-    var DEL_KEY = opts.storageKey + '_del';
-    var del = {};
-    var timer = null;
-    var unsavedIds = {};
-    // Restore persisted deletion list
-    try {
-      var rawDel = localStorage.getItem(DEL_KEY);
-      if (rawDel) del = JSON.parse(rawDel);
-    } catch(e) {}
-    // Restore unsaved IDs (items never confirmed on server)
-    try {
-      var rawData = localStorage.getItem(opts.storageKey);
-      if (rawData) {
-        var parsed = JSON.parse(rawData);
-        if (parsed._unsaved) unsavedIds = parsed._unsaved;
-      }
-    } catch(e) {}
-
-    function saveLocal() {
+  // Local-only storage engine (no cloud sync)
+  function createLocalEngine(opts) {
+    function save() {
       var d = {};
       d[opts.dataKey] = opts.getData();
-      d._unsaved = unsavedIds;
       localStorage.setItem(opts.storageKey, JSON.stringify(d));
-      localStorage.setItem(DEL_KEY, JSON.stringify(del));
     }
-
-    // Merge local into remote. Remote is authoritative for deletions:
-    // local-only items older than 30s are dropped (considered deleted remotely),
-    // EXCEPT items never confirmed on server (tracked in unsavedIds).
-    function mergeSave(remoteArr, localArr) {
-      var now = Date.now();
-      var merged = {};
-      remoteArr.forEach(function(item) { merged[item.id] = item; });
-      localArr.forEach(function(item) {
-        var exist = merged[item.id];
-        if (exist) {
-          if ((item.updatedAt || '') >= (exist.updatedAt || '')) merged[item.id] = item;
-        } else {
-          var age = now - new Date(item.updatedAt || 0).getTime();
-          if (age < 30000 || unsavedIds[item.id]) merged[item.id] = item;
-        }
-      });
-      return merged;
-    }
-
-    function noCacheUrl(base) {
-      return base + '?_t=' + Date.now() + '&_r=' + Math.random().toString(36).slice(2, 8);
-    }
-
-    function save() {
-      var arr = opts.getData();
-      arr.forEach(function(item) { unsavedIds[item.id] = true; });
-      saveLocal();
-      fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
-        headers: { 'X-Master-Key': API_KEY }
-      }).then(function(res) {
-        if (!res.ok) throw new Error('fetch failed');
-        return res.json();
-      }).then(function(data) {
-        var remote = data.record[opts.dataKey] || [];
-        var arr = opts.getData();
-        var merged = mergeSave(remote, arr);
-        Object.keys(del).forEach(function(id) { delete merged[id]; });
-        var result = Object.keys(merged).map(function(id) { return merged[id]; });
-        var body = {};
-        body[opts.dataKey] = result;
-        return fetch('https://api.jsonbin.io/v3/b/' + opts.binId, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-          body: JSON.stringify(body)
-        });
-      }).then(function() {
-        // Re-fetch after PUT to confirm our changes and pull in any concurrent edits
-        return fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
-          headers: { 'X-Master-Key': API_KEY }
-        });
-      }).then(function(res) {
-        if (!res.ok) throw new Error('fetch failed');
-        return res.json();
-      }).then(function(data) {
-        var remote = data.record[opts.dataKey] || [];
-        var arr = opts.getData();
-        var merged = mergeSave(remote, arr);
-        Object.keys(del).forEach(function(id) { delete merged[id]; });
-        var result = Object.keys(merged).map(function(id) { return merged[id]; });
-        var changed = JSON.stringify(result) !== JSON.stringify(arr);
-        if (changed) {
-          arr.length = 0;
-          result.forEach(function(item) { arr.push(item); });
-        }
-        // Clear unsavedIds for items confirmed on remote, and for deleted items
-        remote.forEach(function(item) { delete unsavedIds[item.id]; });
-        Object.keys(del).forEach(function(id) { delete unsavedIds[id]; });
-        saveLocal();
-        if (changed) opts.onRemoteUpdate();
-        // Only clear deletions that remote confirms are gone
-        var remoteIds = {};
-        remote.forEach(function(item) { remoteIds[item.id] = true; });
-        var delChanged2 = false;
-        Object.keys(del).forEach(function(id) {
-          if (!remoteIds[id]) { delete del[id]; delChanged2 = true; }
-        });
-        if (delChanged2) saveLocal();
-        if (opts.onStatus) opts.onStatus('updated');
-      }).catch(function() {
-        if (opts.onStatus) opts.onStatus('err');
-      });
-    }
-
-    function sync() {
-      fetch(noCacheUrl('https://api.jsonbin.io/v3/b/' + opts.binId + '/latest'), {
-        headers: { 'X-Master-Key': API_KEY }
-      }).then(function(res) {
-        if (!res.ok) throw new Error('fetch failed');
-        return res.json();
-      }).then(function(data) {
-        var remoteArr = data.record[opts.dataKey] || [];
-        var arr = opts.getData();
-        var remoteIds = {};
-        remoteArr.forEach(function(item) { remoteIds[item.id] = true; });
-
-        var merged = mergeSave(remoteArr, arr);
-        // Remove items we queued for deletion
-        Object.keys(del).forEach(function(id) { delete merged[id]; });
-        var result = Object.keys(merged).map(function(id) { return merged[id]; });
-        // Clean up del: confirmed-deleted IDs can be cleared
-        var delChanged = false;
-        Object.keys(del).forEach(function(id) {
-          if (!remoteIds[id]) { delete del[id]; delChanged = true; }
-        });
-        // Clear unsavedIds for items now on remote
-        remoteArr.forEach(function(item) { delete unsavedIds[item.id]; });
-        Object.keys(del).forEach(function(id) { delete unsavedIds[id]; });
-        if (JSON.stringify(result) !== JSON.stringify(arr)) {
-          arr.length = 0;
-          result.forEach(function(item) { arr.push(item); });
-          saveLocal();
-          opts.onRemoteUpdate();
-          if (opts.onStatus) opts.onStatus('updated');
-        } else {
-          if (delChanged) saveLocal();
-          if (opts.onStatus) opts.onStatus('ok');
-        }
-      }).catch(function() {
-        if (opts.onStatus) opts.onStatus('err');
-      });
-    }
-
     var saveTimer = null;
     function debouncedSave() {
       if (saveTimer) clearTimeout(saveTimer);
-      saveLocal();
+      save();
       saveTimer = setTimeout(function() { save(); }, 500);
     }
-
-    return {
-      get deletedIds() { return del; },
-      set deletedIds(v) { del = v; },
-      save: save,
-      debouncedSave: debouncedSave,
-      sync: sync,
-      startSync: function() { sync(); timer = setInterval(sync, 5000); }
-    };
+    return { save: save, debouncedSave: debouncedSave };
   }
 
-  // Sync status indicator
-  var syncStatus = { students: 'init', tasks: 'init' };
-  var syncStatusEl = document.getElementById('syncStatus');
-  var syncStatusText = document.getElementById('syncStatusText');
-
-  function updateSyncUI() {
-    var s1 = syncStatus.students, s2 = syncStatus.tasks;
-    if (s1 === 'err' || s2 === 'err') {
-      syncStatusEl.className = 'err';
-      syncStatusText.textContent = '同步失败，请检查网络';
-    } else if (s1 === 'updated' || s2 === 'updated') {
-      syncStatusEl.className = 'ok';
-      syncStatusText.textContent = '已更新 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
-    } else if (s1 === 'ok' && s2 === 'ok') {
-      syncStatusEl.className = 'ok';
-      syncStatusText.textContent = '已连接';
-    }
-  }
-
-  function makeOnStatus(key) {
-    return function(state) {
-      syncStatus[key] = state;
-      updateSyncUI();
-    };
-  }
-
-  var engine = createSyncEngine({
-    binId: BIN_ID,
+  var engine = createLocalEngine({
     storageKey: STORAGE_KEY,
     dataKey: 'students',
-    getData: function() { return people; },
-    onStatus: makeOnStatus('students'),
-    onRemoteUpdate: function() {
-      var existingIds = {};
-      people.forEach(function(p) { existingIds[p.id] = true; });
-      var changed = false;
-      Object.keys(selectedIds).forEach(function(id) {
-        if (!existingIds[id]) { delete selectedIds[id]; changed = true; }
-      });
-      if (Object.keys(selectedIds).length === 0 && selectionMode) {
-        selectionMode = false;
-        changed = true;
-      }
-      render(searchInput.value);
-    }
+    getData: function() { return people; }
   });
 
   const listEl = document.getElementById('list');
@@ -920,7 +701,6 @@
     if (!editingId) return;
     if (!confirm('确定删除该联系人吗？')) return;
     people = people.filter(function(p) { return p.id !== editingId; });
-    engine.deletedIds[editingId] = true;
     engine.save();
     closeModal();
     render(searchInput.value);
@@ -1246,7 +1026,6 @@
     if (ids.length === 0) { alert('请先选择要删除的学生'); return; }
     if (!confirm('确定删除选中的 ' + ids.length + ' 名学生吗？此操作不可恢复。')) return;
     people = people.filter(function(p) { return !selectedIds[p.id]; });
-    ids.forEach(function(id) { engine.deletedIds[id] = true; });
     selectedIds = {};
     selectionMode = false;
     engine.save();
@@ -1411,15 +1190,10 @@
     }
   } catch (e) { tasks = []; }
 
-  var taskEngine = createSyncEngine({
-    binId: TASK_BIN_ID,
+  var taskEngine = createLocalEngine({
     storageKey: TASK_STORAGE_KEY,
     dataKey: 'tasks',
-    getData: function() { return tasks; },
-    onStatus: makeOnStatus('tasks'),
-    onRemoteUpdate: function() {
-      renderTasks(document.getElementById('taskSearchInput').value);
-    }
+    getData: function() { return tasks; }
   });
 
   // Task render
@@ -1523,7 +1297,6 @@
     if (!taskEditingId) return;
     if (!confirm('确定删除该任务吗？')) return;
     tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
-    taskEngine.deletedIds[taskEditingId] = true;
     taskEngine.save();
     closeTaskModal();
     renderTasks(taskSearchInput.value);
@@ -1567,7 +1340,6 @@
       if (action === 'delete') {
         if (!confirm('确定删除该任务吗？')) return;
         tasks = tasks.filter(function(t) { return t.id !== id; });
-        taskEngine.deletedIds[id] = true;
         taskEngine.save();
         renderTasks(taskSearchInput.value);
         return;
@@ -1585,16 +1357,6 @@
 
   // ====== Init ======
   showView('home');
-  engine.startSync();
-  taskEngine.startSync();
-
-  // Sync immediately when user returns to this tab
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-      engine.sync();
-      taskEngine.sync();
-    }
-  });
 })();
 </script>
 <script>// Unregister old PWA service worker
