@@ -497,10 +497,6 @@
       <input type="text" id="fstudentId" placeholder="请输入当前状态">
     </div>
     <div class="form-group">
-      <label>电话</label>
-      <input type="tel" id="fphone" placeholder="请输入电话号码">
-    </div>
-    <div class="form-group">
       <label>备注</label>
       <textarea id="fnotes" placeholder="请输入备注信息"></textarea>
     </div>
@@ -599,7 +595,6 @@
   const fname = document.getElementById('fname');
   const fclass = document.getElementById('fclass');
   const fstudentId = document.getElementById('fstudentId');
-  const fphone = document.getElementById('fphone');
   const fnotes = document.getElementById('fnotes');
 
   let selectionMode = false;
@@ -613,7 +608,6 @@
           return (p.name || '').toLowerCase().indexOf(q) !== -1
             || (p.class || '').toLowerCase().indexOf(q) !== -1
             || (p.studentId || '').toLowerCase().indexOf(q) !== -1
-            || (p.phone || '').toLowerCase().indexOf(q) !== -1
             || (p.notes || '').toLowerCase().indexOf(q) !== -1;
         })
       : people;
@@ -632,7 +626,6 @@
       var infoParts = [];
       if (p.class) infoParts.push('<span>班级：' + esc(p.class) + '</span>');
       if (p.studentId) infoParts.push('<span>当前状态：' + esc(p.studentId) + '</span>');
-      if (p.phone) infoParts.push('<span>电话：' + esc(p.phone) + '</span>');
       var isSel = selectedIds[p.id] ? ' selected' : '';
 
       return '<div class="card' + selClass + isSel + '" data-id="' + p.id + '">'
@@ -659,7 +652,6 @@
     fname.value = person ? person.name : '';
     fclass.value = person ? person.class : '';
     fstudentId.value = person ? person.studentId : '';
-    fphone.value = person ? person.phone : '';
     fnotes.value = person ? person.notes : '';
     btnDelete.style.display = person ? '' : 'none';
     modal.classList.add('active');
@@ -680,7 +672,6 @@
       name: name,
       class: fclass.value.trim(),
       studentId: fstudentId.value.trim(),
-      phone: fphone.value.trim(),
       notes: fnotes.value.trim(),
       updatedAt: new Date().toISOString()
     };
@@ -739,8 +730,8 @@
     var list = getSelectedOrAll(people);
     if (list.length === 0) { alert('没有数据可导出'); return; }
     if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
-    var rows = [['姓名', '班级', '当前状态', '电话', '备注']];
-    list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.phone, p.notes]); });
+    var rows = [['姓名', '班级', '当前状态', '备注']];
+    list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.notes]); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '通讯录');
@@ -785,7 +776,6 @@
     name: ['姓名','名字','名称','学生姓名','学生名字','人员姓名','人员','联系人'],
     class: ['班级','班','班组','年级','专业','系别'],
     studentId: ['学号','当前状态','入党情况','状态','政治面貌','编号'],
-    phone: ['电话','手机','手机号','联系方式','联系电话','电话号','号码'],
     notes: ['备注','说明','附注','其他','描述','补充']
   };
 
@@ -814,7 +804,6 @@
     var nameIdx = findCol(headers, colVariants.name);
     var classIdx = findCol(headers, colVariants.class);
     var sidIdx = findCol(headers, colVariants.studentId);
-    var phoneIdx = findCol(headers, colVariants.phone);
     var notesIdx = findCol(headers, colVariants.notes);
 
     if (nameIdx === -1) {
@@ -830,7 +819,6 @@
         name: (vals[nameIdx] || '').toString().trim(),
         class: classIdx !== -1 ? (vals[classIdx] || '').toString().trim() : '',
         studentId: sidIdx !== -1 ? (vals[sidIdx] || '').toString().trim() : '',
-        phone: phoneIdx !== -1 ? (vals[phoneIdx] || '').toString().trim() : '',
         notes: notesIdx !== -1 ? (vals[notesIdx] || '').toString().trim() : ''
       });
     }
@@ -1045,7 +1033,6 @@
   var batchEditFields = [
     { key: 'studentId', label: '当前状态' },
     { key: 'class', label: '班级' },
-    { key: 'phone', label: '电话' },
     { key: 'notes', label: '备注' }
   ];
 
