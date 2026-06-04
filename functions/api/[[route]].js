@@ -67,14 +67,14 @@ export async function onRequest(context) {
     }
   }
 
-  // POST /api/auth/change - change password
+  // POST /api/auth/change - change login password (requires admin password)
   if (path === "/api/auth/change" && request.method === "POST") {
     try {
       const body = await request.json();
-      const stored = await env.PARTY_DATA.get("_password");
-      const current = stored || "123";
-      if (body.oldPassword !== current) {
-        return new Response(JSON.stringify({ ok: false, error: "当前密码错误" }), {
+      const adminStored = await env.PARTY_DATA.get("_admin_pw");
+      const adminPw = adminStored || "123";
+      if (body.adminPassword !== adminPw) {
+        return new Response(JSON.stringify({ ok: false, error: "管理密码错误" }), {
           headers: { ...cors, "Content-Type": "application/json" }
         });
       }
