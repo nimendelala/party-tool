@@ -415,6 +415,63 @@
   }
   .task-card .task-delete:active { color: #e74c3c; }
 
+  /* Login */
+  .login-card {
+    max-width: 360px;
+    margin: 60px auto 0;
+    text-align: center;
+    padding: 32px 24px;
+  }
+  .login-icon { font-size: 48px; margin-bottom: 16px; }
+  .login-title { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 8px; }
+  .login-subtitle { font-size: 14px; color: #999; margin-bottom: 24px; }
+  .login-input-wrap { margin-bottom: 12px; }
+  .login-input-wrap input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    font-size: 16px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .login-input-wrap input:focus { border-color: #c0392b; }
+  .login-error { color: #e74c3c; font-size: 13px; margin-bottom: 12px; }
+  .login-btn {
+    width: 100%;
+    padding: 12px;
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .login-btn:active { background: #a93226; }
+
+  /* Home actions */
+  .home-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .home-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+    color: #666;
+    transition: all 0.15s;
+  }
+  .home-btn:active { background: #f0f0f0; }
+  .home-btn.btn-logout { color: #e74c3c; border-color: #e8c8c8; }
+
 </style>
 </head>
 <body>
@@ -429,8 +486,22 @@
 
 <div class="container">
 
+  <!-- ====== Login View ====== -->
+  <div id="view-login" class="view active">
+    <div class="login-card">
+      <div class="login-icon">🔒</div>
+      <h2 class="login-title">体育系党支部工具箱</h2>
+      <p class="login-subtitle">内部工具，请输入密码</p>
+      <div class="login-input-wrap">
+        <input type="password" id="loginPassword" placeholder="请输入密码" autocomplete="off">
+      </div>
+      <p class="login-error" id="loginError" style="display:none">密码错误</p>
+      <button class="login-btn" id="loginBtn">登 录</button>
+    </div>
+  </div>
+
   <!-- ====== Home View ====== -->
-  <div id="view-home" class="view active">
+  <div id="view-home" class="view">
     <div class="home-cards">
       <div class="home-card card-students" id="navStudents">
         <div class="card-icon">👥</div>
@@ -442,6 +513,10 @@
         <div class="card-title">工作列表</div>
         <div class="card-subtitle">查看和管理待办工作任务</div>
       </div>
+    </div>
+    <div class="home-actions">
+      <button class="home-btn btn-changepw" id="btnChangePw">修改密码</button>
+      <button class="home-btn btn-logout" id="btnLogout">退出登录</button>
     </div>
   </div>
 
@@ -538,6 +613,24 @@
     <div class="form-actions">
       <button class="btn-cancel" id="btnBatchEditCancel">取消</button>
       <button class="btn-save" id="btnBatchEditApply" style="display:none">应用到已选</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pwModal">
+  <div class="modal">
+    <h3>修改密码</h3>
+    <div class="form-group">
+      <label>当前密码</label>
+      <input type="password" id="fOldPw" placeholder="请输入当前密码">
+    </div>
+    <div class="form-group">
+      <label>新密码</label>
+      <input type="password" id="fNewPw" placeholder="请输入新密码">
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="btnPwCancel">取消</button>
+      <button class="btn-save" id="btnPwSave">确认修改</button>
     </div>
   </div>
 </div>
@@ -1257,7 +1350,9 @@
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      if (batchEditModal.classList.contains('active')) {
+      if (pwModal.classList.contains('active')) {
+        pwModal.classList.remove('active');
+      } else if (batchEditModal.classList.contains('active')) {
         closeBatchEditModal();
       } else if (taskModal && taskModal.classList.contains('active')) {
         closeTaskModal();
@@ -1542,10 +1637,111 @@
     origCloseBatch();
   };
 
-  // ====== Init ======
-  engine.loadData(function() {
-    showView('home');
+  // ====== Auth ======
+  var loggedIn = false;
+
+  function checkSession() {
+    return localStorage.getItem('party_session') === '1';
+  }
+
+  function setSession() {
+    localStorage.setItem('party_session', '1');
+    loggedIn = true;
+  }
+
+  function clearSession() {
+    localStorage.removeItem('party_session');
+    loggedIn = false;
+  }
+
+  // Login
+  document.getElementById('loginBtn').addEventListener('click', function() {
+    var pw = document.getElementById('loginPassword').value.trim();
+    if (!pw) return;
+    var btn = this;
+    btn.textContent = '验证中...';
+    btn.disabled = true;
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          setSession();
+          document.getElementById('loginError').style.display = 'none';
+          document.getElementById('loginPassword').value = '';
+          engine.loadData(function() {
+            showView('home');
+          });
+        } else {
+          document.getElementById('loginError').style.display = '';
+          document.getElementById('loginPassword').value = '';
+          document.getElementById('loginPassword').focus();
+        }
+        btn.textContent = '登 录';
+        btn.disabled = false;
+      })
+      .catch(function() {
+        document.getElementById('loginError').style.display = '';
+        btn.textContent = '登 录';
+        btn.disabled = false;
+      });
   });
+
+  // Enter key on password field
+  document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('loginBtn').click();
+  });
+
+  // Logout
+  document.getElementById('btnLogout').addEventListener('click', function() {
+    clearSession();
+    showView('login');
+  });
+
+  // Change password
+  var pwModal = document.getElementById('pwModal');
+  document.getElementById('btnChangePw').addEventListener('click', function() {
+    document.getElementById('fOldPw').value = '';
+    document.getElementById('fNewPw').value = '';
+    pwModal.classList.add('active');
+    document.getElementById('fOldPw').focus();
+  });
+  document.getElementById('btnPwCancel').addEventListener('click', function() {
+    pwModal.classList.remove('active');
+  });
+  document.getElementById('btnPwSave').addEventListener('click', function() {
+    var oldPw = document.getElementById('fOldPw').value.trim();
+    var newPw = document.getElementById('fNewPw').value.trim();
+    if (!oldPw || !newPw) { alert('请填写完整'); return; }
+    fetch('/api/auth/change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw })
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          alert('密码修改成功');
+          pwModal.classList.remove('active');
+        } else {
+          alert(data.error || '修改失败');
+        }
+      })
+      .catch(function() { alert('网络错误，请重试'); });
+  });
+  pwModal.addEventListener('click', function(e) {
+    if (e.target === pwModal) pwModal.classList.remove('active');
+  });
+
+  // ====== Init ======
+  if (checkSession()) {
+    setSession();
+    showView('home');
+    engine.loadData(function() {});
+  } else {
+    showView('login');
+  }
 })();
 </script>
 <script>// Unregister old PWA service worker

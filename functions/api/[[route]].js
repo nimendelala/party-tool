@@ -5,7 +5,7 @@ export async function onRequest(context) {
 
   const cors = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type"
   };
 
@@ -45,6 +45,45 @@ export async function onRequest(context) {
       });
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" }
+      });
+    }
+  }
+
+  // POST /api/auth - verify password
+  if (path === "/api/auth" && request.method === "POST") {
+    try {
+      const body = await request.json();
+      const stored = await env.PARTY_DATA.get("_password");
+      const valid = body.password === (stored || "123");
+      return new Response(JSON.stringify({ ok: valid }), {
+        headers: { ...cors, "Content-Type": "application/json" }
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false }), {
+        headers: { ...cors, "Content-Type": "application/json" }
+      });
+    }
+  }
+
+  // POST /api/auth/change - change password
+  if (path === "/api/auth/change" && request.method === "POST") {
+    try {
+      const body = await request.json();
+      const stored = await env.PARTY_DATA.get("_password");
+      const current = stored || "123";
+      if (body.oldPassword !== current) {
+        return new Response(JSON.stringify({ ok: false, error: "当前密码错误" }), {
+          headers: { ...cors, "Content-Type": "application/json" }
+        });
+      }
+      await env.PARTY_DATA.put("_password", body.newPassword);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...cors, "Content-Type": "application/json" }
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), {
         status: 500,
         headers: { ...cors, "Content-Type": "application/json" }
       });
