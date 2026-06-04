@@ -667,13 +667,13 @@
 
   // Cloud API storage engine
   var engine = (function() {
+    // Returns a promise so callers can wait for the write to complete
     function save() {
-      // Write students + tasks together so neither is lost
-      fetch(API_BASE, {
+      return fetch(API_BASE, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ students: people, tasks: tasks })
-      }).catch(function() {});
+      });
     }
     var saveTimer = null;
     function debouncedSave() {
@@ -884,21 +884,22 @@
       people.push(data);
     }
 
-    engine.save();
+    engine.save().then(function() {
+      engine.syncFromCloud(function() { render(searchInput.value); });
+    });
     closeModal();
     render(searchInput.value);
-    // Pull latest from cloud in case others edited simultaneously
-    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   }
 
   function deletePerson() {
     if (!editingId) return;
     if (!confirm('确定删除该联系人吗？')) return;
     people = people.filter(function(p) { return p.id !== editingId; });
-    engine.save();
+    engine.save().then(function() {
+      engine.syncFromCloud(function() { render(searchInput.value); });
+    });
     closeModal();
     render(searchInput.value);
-    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   }
 
   // Events
@@ -1222,9 +1223,10 @@
     people = people.filter(function(p) { return !selectedIds[p.id]; });
     selectedIds = {};
     selectionMode = false;
-    engine.save();
+    engine.save().then(function() {
+      engine.syncFromCloud(function() { render(searchInput.value); });
+    });
     render(searchInput.value);
-    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   });
 
   // Batch edit
@@ -1304,12 +1306,13 @@
       }
     });
 
-    engine.save();
+    engine.save().then(function() {
+      engine.syncFromCloud(function() { render(searchInput.value); });
+    });
     closeBatchEditModal();
     selectedIds = {};
     selectionMode = false;
     render(searchInput.value);
-    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   }
 
   function closeBatchEditModal() {
@@ -1394,11 +1397,11 @@
 
   var taskEngine = (function() {
     function save() {
-      fetch(API_BASE, {
+      return fetch(API_BASE, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ students: people, tasks: tasks })
-      }).catch(function() {});
+      });
     }
     var saveTimer = null;
     function debouncedSave() {
@@ -1506,20 +1509,22 @@
       tasks.push(data);
     }
 
-    taskEngine.save();
+    taskEngine.save().then(function() {
+      engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); });
+    });
     closeTaskModal();
     renderTasks(taskSearchInput.value);
-    setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 500);
   }
 
   function deleteTask() {
     if (!taskEditingId) return;
     if (!confirm('确定删除该任务吗？')) return;
     tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
-    taskEngine.save();
+    taskEngine.save().then(function() {
+      engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); });
+    });
     closeTaskModal();
     renderTasks(taskSearchInput.value);
-    setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 500);
   }
 
   function toggleTaskComplete(id) {
@@ -1561,9 +1566,10 @@
       if (action === 'delete') {
         if (!confirm('确定删除该任务吗？')) return;
         tasks = tasks.filter(function(t) { return t.id !== id; });
-        taskEngine.save();
+        taskEngine.save().then(function() {
+          engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); });
+        });
         renderTasks(taskSearchInput.value);
-        setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 500);
         return;
       }
       if (action === 'edit') {

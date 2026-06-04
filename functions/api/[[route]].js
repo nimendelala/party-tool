@@ -3,14 +3,15 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  const cors = {
+  const apiHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Cache-Control": "no-store, no-cache, must-revalidate"
   };
 
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: cors });
+    return new Response(null, { headers: apiHeaders });
   }
 
   // GET /api/data - read shared data
@@ -21,11 +22,11 @@ export async function onRequest(context) {
       const tasksRaw = await env.PARTY_DATA.get("tasks");
       const tasks = tasksRaw ? JSON.parse(tasksRaw) : [];
       return new Response(JSON.stringify({ students: students, tasks: tasks }), {
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
       return new Response(JSON.stringify({ students: [], tasks: [] }), {
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     }
   }
@@ -41,12 +42,12 @@ export async function onRequest(context) {
         await env.PARTY_DATA.put("tasks", JSON.stringify(body.tasks));
       }
       return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message }), {
         status: 500,
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     }
   }
@@ -58,11 +59,11 @@ export async function onRequest(context) {
       const stored = await env.PARTY_DATA.get("_password");
       const valid = body.password === (stored || "123");
       return new Response(JSON.stringify({ ok: valid }), {
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false }), {
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     }
   }
@@ -75,17 +76,17 @@ export async function onRequest(context) {
       const adminPw = adminStored || "123";
       if (body.adminPassword !== adminPw) {
         return new Response(JSON.stringify({ ok: false, error: "管理密码错误" }), {
-          headers: { ...cors, "Content-Type": "application/json" }
+          headers: { ...apiHeaders, "Content-Type": "application/json" }
         });
       }
       await env.PARTY_DATA.put("_password", body.newPassword);
       return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), {
         status: 500,
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     }
   }
