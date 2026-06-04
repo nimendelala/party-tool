@@ -1484,17 +1484,29 @@
 
   // Refresh buttons
   document.getElementById('btnRefreshStudents').addEventListener('click', function() {
+    var btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '同步中...';
     markEditing(true);
     engine.syncFromCloud(function(ok) {
       render(searchInput.value);
       markEditing(false);
+      btn.textContent = '已刷新';
+      setTimeout(function() { btn.textContent = '刷新'; btn.disabled = false; }, 800);
     });
   });
   document.getElementById('btnRefreshTasks').addEventListener('click', function() {
+    var btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '同步中...';
     markEditing(true);
     engine.syncFromCloud(function(ok) {
       renderTasks(taskSearchInput.value);
       markEditing(false);
+      btn.textContent = '已刷新';
+      setTimeout(function() { btn.textContent = '刷新'; btn.disabled = false; }, 800);
     });
   });
 
