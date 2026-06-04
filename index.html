@@ -684,7 +684,7 @@
 
     // Load from API, fallback to localStorage
     function loadData(callback) {
-      fetch(API_BASE)
+      fetch(API_BASE + '?_=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
           var arr = data.students || data;
@@ -728,7 +728,7 @@
 
     // Pull latest data from cloud without saving local changes first
     function syncFromCloud(callback) {
-      fetch(API_BASE)
+      fetch(API_BASE + '?_=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (Array.isArray(data.students)) {
