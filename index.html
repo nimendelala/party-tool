@@ -623,7 +623,15 @@
             || (p.studentId || '').toLowerCase().indexOf(q) !== -1
             || (p.notes || '').toLowerCase().indexOf(q) !== -1;
         })
-      : people;
+      : people.slice();
+
+    // Sort by class, then by name
+    filtered.sort(function(a, b) {
+      var ca = (a.class || '').trim();
+      var cb = (b.class || '').trim();
+      if (ca !== cb) return ca.localeCompare(cb, 'zh');
+      return (a.name || '').trim().localeCompare((b.name || '').trim(), 'zh');
+    });
 
     filteredPeople = filtered;
 
