@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "party-tool",
+  "main": "functions/api/data.js",
   "compatibility_date": "2026-05-24",
   "observability": {
     "enabled": true
@@ -10,5 +11,11 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "PARTY_DATA",
+      "id": "a31a17d5f45e4a9eb2e779ca157094d5"
+    }
   ]
 }

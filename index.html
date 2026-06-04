@@ -562,24 +562,19 @@
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
+  const API_BASE = '/api/data';
   let people = [];
   let editingId = null;
 
-  // Load from localStorage
-  try {
-    var raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      var parsed = JSON.parse(raw);
-      people = parsed.students || parsed;
-    }
-  } catch (e) { people = []; }
-
-  // Local-only storage engine (no cloud sync)
-  function createLocalEngine(opts) {
+  // Cloud API storage engine
+  var engine = (function() {
     function save() {
-      var d = {};
-      d[opts.dataKey] = opts.getData();
-      localStorage.setItem(opts.storageKey, JSON.stringify(d));
+      // Write to API asynchronously
+      fetch(API_BASE, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: people })
+      }).catch(function() {});
     }
     var saveTimer = null;
     function debouncedSave() {
@@ -587,14 +582,53 @@
       save();
       saveTimer = setTimeout(function() { save(); }, 500);
     }
-    return { save: save, debouncedSave: debouncedSave };
-  }
 
-  var engine = createLocalEngine({
-    storageKey: STORAGE_KEY,
-    dataKey: 'students',
-    getData: function() { return people; }
-  });
+    // Load from API, fallback to localStorage
+    function loadData(callback) {
+      fetch(API_BASE)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var arr = data.students || data;
+          if (Array.isArray(arr) && arr.length > 0) {
+            people = arr;
+          } else {
+            // Fallback: try localStorage
+            try {
+              var raw = localStorage.getItem(STORAGE_KEY);
+              if (raw) {
+                var parsed = JSON.parse(raw);
+                people = parsed.students || parsed;
+                save();
+              }
+            } catch (e) { people = []; }
+          }
+          // Load tasks from same response
+          if (Array.isArray(data.tasks)) {
+            tasks = data.tasks;
+          } else {
+            try {
+              var tr = localStorage.getItem(TASK_STORAGE_KEY);
+              if (tr) { var tp = JSON.parse(tr); tasks = tp.tasks || []; }
+            } catch (e) { tasks = []; }
+          }
+          callback();
+        })
+        .catch(function() {
+          // Network error: use localStorage
+          try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) { var parsed = JSON.parse(raw); people = parsed.students || parsed; }
+          } catch (e) { people = []; }
+          try {
+            var tr = localStorage.getItem(TASK_STORAGE_KEY);
+            if (tr) { var tp = JSON.parse(tr); tasks = tp.tasks || []; }
+          } catch (e) { tasks = []; }
+          callback();
+        });
+    }
+
+    return { save: save, debouncedSave: debouncedSave, loadData: loadData };
+  })();
 
   const listEl = document.getElementById('list');
   const countEl = document.getElementById('peopleCount');
@@ -1202,19 +1236,28 @@
   var TASK_STORAGE_KEY = 'task_app_data';
   var tasks = [];
   var taskEditingId = null;
-  try {
-    var taskRaw = localStorage.getItem(TASK_STORAGE_KEY);
-    if (taskRaw) {
-      var taskParsed = JSON.parse(taskRaw);
-      tasks = taskParsed.tasks || [];
-    }
-  } catch (e) { tasks = []; }
 
-  var taskEngine = createLocalEngine({
-    storageKey: TASK_STORAGE_KEY,
-    dataKey: 'tasks',
-    getData: function() { return tasks; }
-  });
+  var taskEngine = (function() {
+    function save() {
+      fetch(API_BASE, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: people, tasks: tasks })
+      }).catch(function() {});
+    }
+    var saveTimer = null;
+    function debouncedSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      save();
+      saveTimer = setTimeout(function() { save(); }, 500);
+    }
+    function loadData(callback) {
+      // Tasks are loaded together with students via engine.loadData
+      // This just provides the save API, actual loading is in engine.loadData
+      callback();
+    }
+    return { save: save, debouncedSave: debouncedSave, loadData: loadData };
+  })();
 
   // Task render
   var taskListEl = document.getElementById('taskList');
@@ -1376,7 +1419,9 @@
   });
 
   // ====== Init ======
-  showView('home');
+  engine.loadData(function() {
+    showView('home');
+  });
 })();
 </script>
 <script>// Unregister old PWA service worker
