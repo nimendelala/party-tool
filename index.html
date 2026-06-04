@@ -840,7 +840,7 @@
   document.getElementById('btnExportCsv').addEventListener('click', function() {
     var list = getSelectedOrAll(people);
     if (list.length === 0) { alert('没有数据可导出'); return; }
-    if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
+    loadXlsx(function() {
     var rows = [['姓名', '班级', '当前状态', '备注']];
     list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.notes]); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
@@ -850,6 +850,7 @@
     downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'contacts-' + new Date().toISOString().slice(0,10) + '.xlsx');
     selectedIds = {};
     if (selectionMode) render(searchInput.value);
+  }); // end loadXlsx
   });
 
   // JSON export (backup)
@@ -957,7 +958,7 @@
       }
 
       if (ext === 'xlsx' || ext === 'xls') {
-        if (typeof XLSX === 'undefined') { alert('Excel 组件加载中，请稍后重试'); return; }
+        loadXlsx(function() {
         try {
           var wb = XLSX.read(e.target.result, { type: 'array' });
           var sheetName = wb.SheetNames[0];
@@ -1014,6 +1015,7 @@
         } catch (err) {
           alert('Excel 文件解析失败，请确认文件格式正确');
         }
+        }); // end loadXlsx
         return;
       }
 
@@ -1547,8 +1549,29 @@ if ('serviceWorker' in navigator) {
   }
 }
 </script>
-<script>// Load XLSX async so it doesn't block the page
-(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.async=true;document.head.appendChild(s);})();
+<script>// Lazy-load XLSX only when needed (fast initial load)
+var _xlsxLoaded = false;
+var _xlsxLoading = false;
+var _xlsxCallbacks = [];
+function loadXlsx(cb) {
+  if (typeof XLSX !== 'undefined') { cb(); return; }
+  _xlsxCallbacks.push(cb);
+  if (_xlsxLoading) return;
+  _xlsxLoading = true;
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  s.onload = function() {
+    _xlsxLoaded = true;
+    _xlsxCallbacks.forEach(function(f) { f(); });
+    _xlsxCallbacks = [];
+  };
+  s.onerror = function() {
+    _xlsxLoading = false;
+    _xlsxCallbacks = [];
+    alert('Excel 组件加载失败，请检查网络后刷新重试');
+  };
+  document.head.appendChild(s);
+}
 </script>
 </body>
 </html>
