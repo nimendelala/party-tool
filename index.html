@@ -104,6 +104,8 @@
   .toolbar .btn-select { color: #8e44ad; border-color: #8e44ad; }
   .toolbar .btn-select:active { background: #f5eef8; }
   .toolbar .btn-select.active { background: #8e44ad; color: #fff; }
+  .toolbar .btn-refresh { color: #2980b9; border-color: #2980b9; }
+  .toolbar .btn-refresh:active { background: #eaf2fb; }
 
   /* Form modal */
   .modal-overlay {
@@ -455,6 +457,7 @@
       <button class="btn-backup" id="btnExportJson">备份</button>
       <button class="btn-import" id="btnImport">导入</button>
       <button class="btn-select" id="btnSelect">选择</button>
+      <button class="btn-refresh" id="btnRefreshStudents">刷新</button>
     </div>
     <div class="batch-bar" id="batchBar">
       <span class="selected-count" id="selectedCount">已选 0 人</span>
@@ -475,6 +478,9 @@
       <input type="text" id="taskSearchInput" placeholder="搜索任务标题、备注...">
     </div>
     <button class="add-btn" id="taskAddBtn">+ 添加任务</button>
+    <div class="toolbar">
+      <button class="btn-refresh" id="btnRefreshTasks">刷新</button>
+    </div>
     <div class="task-count" id="taskCount"></div>
     <div class="list" id="taskList"></div>
   </div>
@@ -569,11 +575,11 @@
   // Cloud API storage engine
   var engine = (function() {
     function save() {
-      // Write to API asynchronously
+      // Write students + tasks together so neither is lost
       fetch(API_BASE, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: people })
+        body: JSON.stringify({ students: people, tasks: tasks })
       }).catch(function() {});
     }
     var saveTimer = null;
@@ -627,8 +633,55 @@
         });
     }
 
-    return { save: save, debouncedSave: debouncedSave, loadData: loadData };
+    // Pull latest data from cloud without saving local changes first
+    function syncFromCloud(callback) {
+      fetch(API_BASE)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (Array.isArray(data.students)) {
+            people = data.students;
+          }
+          if (Array.isArray(data.tasks)) {
+            tasks = data.tasks;
+          }
+          if (callback) callback(true);
+        })
+        .catch(function() {
+          if (callback) callback(false);
+        });
+    }
+
+    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: syncFromCloud };
   })();
+
+  // Auto-sync timer (every 5 seconds when not editing)
+  var syncTimer = null;
+  var isEditing = false;
+
+  function startAutoSync() {
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = setInterval(function() {
+      if (isEditing) return;
+      if (document.getElementById('view-students').classList.contains('active') ||
+          document.getElementById('view-tasks').classList.contains('active')) {
+        engine.syncFromCloud(function(ok) {
+          if (ok) {
+            if (document.getElementById('view-students').classList.contains('active')) {
+              render(searchInput.value);
+            } else if (document.getElementById('view-tasks').classList.contains('active')) {
+              renderTasks(taskSearchInput.value);
+            }
+          }
+        });
+      }
+    }, 5000);
+  }
+
+  function markEditing(on) {
+    isEditing = on;
+  }
+
+  startAutoSync();
 
   const listEl = document.getElementById('list');
   const countEl = document.getElementById('peopleCount');
@@ -1256,7 +1309,7 @@
       // This just provides the save API, actual loading is in engine.loadData
       callback();
     }
-    return { save: save, debouncedSave: debouncedSave, loadData: loadData };
+    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: engine.syncFromCloud };
   })();
 
   // Task render
@@ -1417,6 +1470,54 @@
     var t = tasks.find(function(t) { return t.id === id; });
     if (t) openTaskModal(t);
   });
+
+  // Refresh buttons
+  document.getElementById('btnRefreshStudents').addEventListener('click', function() {
+    markEditing(true);
+    engine.syncFromCloud(function(ok) {
+      render(searchInput.value);
+      markEditing(false);
+    });
+  });
+  document.getElementById('btnRefreshTasks').addEventListener('click', function() {
+    markEditing(true);
+    engine.syncFromCloud(function(ok) {
+      renderTasks(taskSearchInput.value);
+      markEditing(false);
+    });
+  });
+
+  // Pause auto-sync while editing
+  var origOpenStudent = openModal;
+  openModal = function(person) {
+    markEditing(true);
+    origOpenStudent(person);
+  };
+  var origCloseStudent = closeModal;
+  closeModal = function() {
+    markEditing(false);
+    origCloseStudent();
+  };
+  var origOpenTask = openTaskModal;
+  openTaskModal = function(task) {
+    markEditing(true);
+    origOpenTask(task);
+  };
+  var origCloseTask = closeTaskModal;
+  closeTaskModal = function() {
+    markEditing(false);
+    origCloseTask();
+  };
+  var origOpenBatch = openBatchEditModal;
+  openBatchEditModal = function() {
+    markEditing(true);
+    origOpenBatch();
+  };
+  var origCloseBatch = closeBatchEditModal;
+  closeBatchEditModal = function() {
+    markEditing(false);
+    origCloseBatch();
+  };
 
   // ====== Init ======
   engine.loadData(function() {
