@@ -1,13 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "party-tool",
-  "main": "functions/api/data.js",
+  "pages_build_output_dir": ".",
   "compatibility_date": "2026-05-24",
   "observability": {
     "enabled": true
-  },
-  "assets": {
-    "directory": "."
   },
   "compatibility_flags": [
     "nodejs_compat"
