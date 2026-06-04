@@ -674,7 +674,7 @@
           }
         });
       }
-    }, 5000);
+    }, 3000);
   }
 
   function markEditing(on) {
@@ -794,6 +794,8 @@
     engine.save();
     closeModal();
     render(searchInput.value);
+    // Pull latest from cloud in case others edited simultaneously
+    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   }
 
   function deletePerson() {
@@ -803,6 +805,7 @@
     engine.save();
     closeModal();
     render(searchInput.value);
+    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   }
 
   // Events
@@ -1126,6 +1129,7 @@
     selectionMode = false;
     engine.save();
     render(searchInput.value);
+    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   });
 
   // Batch edit
@@ -1210,6 +1214,7 @@
     selectedIds = {};
     selectionMode = false;
     render(searchInput.value);
+    setTimeout(function() { engine.syncFromCloud(function() { render(searchInput.value); }); }, 500);
   }
 
   function closeBatchEditModal() {
@@ -1407,6 +1412,7 @@
     taskEngine.save();
     closeTaskModal();
     renderTasks(taskSearchInput.value);
+    setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 500);
   }
 
   function deleteTask() {
@@ -1416,6 +1422,7 @@
     taskEngine.save();
     closeTaskModal();
     renderTasks(taskSearchInput.value);
+    setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 500);
   }
 
   function toggleTaskComplete(id) {
@@ -1425,6 +1432,7 @@
       task.updatedAt = new Date().toISOString();
       taskEngine.debouncedSave();
       renderTasks(taskSearchInput.value);
+      setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 800);
     }
   }
 
@@ -1458,6 +1466,7 @@
         tasks = tasks.filter(function(t) { return t.id !== id; });
         taskEngine.save();
         renderTasks(taskSearchInput.value);
+        setTimeout(function() { engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); }); }, 500);
         return;
       }
       if (action === 'edit') {
