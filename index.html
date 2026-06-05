@@ -529,7 +529,6 @@
     <button class="add-btn" id="addBtn">+ 添加学生</button>
     <div class="toolbar">
       <button class="btn-export" id="btnExportCsv">导出 Excel</button>
-      <button class="btn-backup" id="btnExportJson">备份</button>
       <button class="btn-import" id="btnImport">导入</button>
       <button class="btn-select" id="btnSelect">选择</button>
       <button class="btn-refresh" id="btnRefreshStudents">刷新</button>
@@ -953,13 +952,6 @@
     selectedIds = {};
     if (selectionMode) render(searchInput.value);
   }); // end loadXlsx
-  });
-
-  // JSON export (backup)
-  document.getElementById('btnExportJson').addEventListener('click', function() {
-    var list = getSelectedOrAll(people);
-    if (list.length === 0) { alert('没有数据可导出'); return; }
-    downloadBlob(new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' }), 'contacts-backup-' + new Date().toISOString().slice(0,10) + '.json');
   });
 
   // Import (CSV + JSON)
