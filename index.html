@@ -675,6 +675,18 @@
         body: JSON.stringify({ students: people, tasks: tasks })
       });
     }
+
+    // Save then double-sync to beat KV eventual consistency lag
+    function saveAndSync(callback) {
+      save().then(function() {
+        engine.syncFromCloud(callback);
+        // Second sync after 1.5s to catch up if first hit a stale edge node
+        setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
+      }).catch(function() {
+        engine.syncFromCloud(callback);
+        setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
+      });
+    }
     var saveTimer = null;
     function debouncedSave() {
       if (saveTimer) clearTimeout(saveTimer);
@@ -744,7 +756,7 @@
         });
     }
 
-    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: syncFromCloud };
+    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: syncFromCloud, saveAndSync: saveAndSync };
   })();
 
   // Auto-sync timer (every 5 seconds when not editing)
@@ -767,7 +779,7 @@
           }
         });
       }
-    }, 3000);
+    }, 2000);
   }
 
   function markEditing(on) {
@@ -884,9 +896,7 @@
       people.push(data);
     }
 
-    engine.save().then(function() {
-      engine.syncFromCloud(function() { render(searchInput.value); });
-    });
+    engine.saveAndSync(function() { render(searchInput.value); });
     closeModal();
     render(searchInput.value);
   }
@@ -895,9 +905,7 @@
     if (!editingId) return;
     if (!confirm('确定删除该联系人吗？')) return;
     people = people.filter(function(p) { return p.id !== editingId; });
-    engine.save().then(function() {
-      engine.syncFromCloud(function() { render(searchInput.value); });
-    });
+    engine.saveAndSync(function() { render(searchInput.value); });
     closeModal();
     render(searchInput.value);
   }
@@ -1223,9 +1231,7 @@
     people = people.filter(function(p) { return !selectedIds[p.id]; });
     selectedIds = {};
     selectionMode = false;
-    engine.save().then(function() {
-      engine.syncFromCloud(function() { render(searchInput.value); });
-    });
+    engine.saveAndSync(function() { render(searchInput.value); });
     render(searchInput.value);
   });
 
@@ -1306,9 +1312,7 @@
       }
     });
 
-    engine.save().then(function() {
-      engine.syncFromCloud(function() { render(searchInput.value); });
-    });
+    engine.saveAndSync(function() { render(searchInput.value); });
     closeBatchEditModal();
     selectedIds = {};
     selectionMode = false;
@@ -1403,6 +1407,15 @@
         body: JSON.stringify({ students: people, tasks: tasks })
       });
     }
+    function saveAndSync(callback) {
+      save().then(function() {
+        engine.syncFromCloud(callback);
+        setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
+      }).catch(function() {
+        engine.syncFromCloud(callback);
+        setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
+      });
+    }
     var saveTimer = null;
     function debouncedSave() {
       if (saveTimer) clearTimeout(saveTimer);
@@ -1414,7 +1427,7 @@
       // This just provides the save API, actual loading is in engine.loadData
       callback();
     }
-    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: engine.syncFromCloud };
+    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: engine.syncFromCloud, saveAndSync: saveAndSync };
   })();
 
   // Task render
@@ -1509,9 +1522,7 @@
       tasks.push(data);
     }
 
-    taskEngine.save().then(function() {
-      engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); });
-    });
+    taskEngine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
     closeTaskModal();
     renderTasks(taskSearchInput.value);
   }
@@ -1520,9 +1531,7 @@
     if (!taskEditingId) return;
     if (!confirm('确定删除该任务吗？')) return;
     tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
-    taskEngine.save().then(function() {
-      engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); });
-    });
+    taskEngine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
     closeTaskModal();
     renderTasks(taskSearchInput.value);
   }
@@ -1566,9 +1575,7 @@
       if (action === 'delete') {
         if (!confirm('确定删除该任务吗？')) return;
         tasks = tasks.filter(function(t) { return t.id !== id; });
-        taskEngine.save().then(function() {
-          engine.syncFromCloud(function() { renderTasks(taskSearchInput.value); });
-        });
+        taskEngine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
         renderTasks(taskSearchInput.value);
         return;
       }
