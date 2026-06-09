@@ -21,9 +21,7 @@ export async function onRequest(context) {
       const students = raw ? JSON.parse(raw) : [];
       const tasksRaw = await env.PARTY_DATA.get("tasks");
       const tasks = tasksRaw ? JSON.parse(tasksRaw) : [];
-      const groupsRaw = await env.PARTY_DATA.get("_groups");
-      const groups = groupsRaw ? JSON.parse(groupsRaw) : [];
-      return new Response(JSON.stringify({ students: students, tasks: tasks, groups: groups }), {
+      return new Response(JSON.stringify({ students: students, tasks: tasks }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
@@ -42,9 +40,6 @@ export async function onRequest(context) {
       }
       if (Array.isArray(body.tasks)) {
         await env.PARTY_DATA.put("tasks", JSON.stringify(body.tasks));
-      }
-      if (Array.isArray(body.groups)) {
-        await env.PARTY_DATA.put("_groups", JSON.stringify(body.groups));
       }
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
