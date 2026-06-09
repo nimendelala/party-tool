@@ -472,6 +472,86 @@
   .home-btn:active { background: #f0f0f0; }
   .home-btn.btn-logout { color: #e74c3c; border-color: #e8c8c8; }
 
+  /* Group tabs */
+  .group-tabs-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .group-tabs {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .group-tabs::-webkit-scrollbar { display: none; }
+  .group-tab {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .group-tab.active {
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+  }
+  .group-manage-btn {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    background: none;
+    border: 1px dashed #ccc;
+    border-radius: 16px;
+    font-size: 12px;
+    color: #999;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .group-manage-btn:active { background: #f0f0f0; }
+
+  /* Group list in modal */
+  .group-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .group-item .group-name { flex: 1; font-size: 15px; }
+  .group-item button {
+    background: none;
+    border: none;
+    font-size: 13px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .group-item .g-rename { color: #2980b9; }
+  .group-item .g-rename:active { background: #eaf2fb; }
+  .group-item .g-delete { color: #e74c3c; }
+  .group-item .g-delete:active { background: #fee; }
+
+  /* Group tag on student cards */
+  .card .group-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #fef0ef;
+    color: #c0392b;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
 </style>
 </head>
 <body>
@@ -541,6 +621,15 @@
       <button class="btn-cancel-batch" id="btnCancelBatch">取消</button>
     </div>
     <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls" style="display:none">
+
+    <!-- Group tabs -->
+    <div class="group-tabs-wrap" id="groupTabsWrap">
+      <div class="group-tabs" id="groupTabs">
+        <span class="group-tab active" data-group="">全部</span>
+      </div>
+      <button class="group-manage-btn" id="btnManageGroups">管理分组</button>
+    </div>
+
     <div class="people-count" id="peopleCount"></div>
     <div class="list" id="list"></div>
   </div>
@@ -580,6 +669,12 @@
         <option value="发展对象">发展对象</option>
         <option value="预备党员">预备党员</option>
         <option value="正式党员">正式党员</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>分组</label>
+      <select id="fgroup">
+        <option value="">无分组</option>
       </select>
     </div>
     <div class="form-group">
@@ -634,6 +729,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="groupModal">
+  <div class="modal">
+    <h3>管理分组</h3>
+    <div id="groupList"></div>
+    <div class="form-group" style="margin-top:12px">
+      <label>添加新分组</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="fNewGroup" placeholder="输入分组名称" style="flex:1">
+        <button class="btn-save" id="btnAddGroup" style="flex:none;padding:10px 16px;font-size:14px">添加</button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="btnGroupCancel">关闭</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="taskModal">
   <div class="modal">
     <h3 id="taskModalTitle">添加任务</h3>
@@ -663,6 +775,8 @@
   const API_BASE = '/api/data';
   let people = [];
   let editingId = null;
+  let groups = [];
+  let activeGroup = '';
 
   // Cloud API storage engine
   var engine = (function() {
@@ -671,7 +785,7 @@
       return fetch(API_BASE, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: people, tasks: tasks })
+        body: JSON.stringify({ students: people, tasks: tasks, groups: groups })
       });
     }
 
@@ -721,6 +835,9 @@
               if (tr) { var tp = JSON.parse(tr); tasks = tp.tasks || []; }
             } catch (e) { tasks = []; }
           }
+          if (Array.isArray(data.groups)) {
+            groups = data.groups;
+          }
           callback();
         })
         .catch(function() {
@@ -748,6 +865,9 @@
           if (Array.isArray(data.tasks)) {
             tasks = data.tasks;
           }
+          if (Array.isArray(data.groups)) {
+            groups = data.groups;
+          }
           if (callback) callback(true);
         })
         .catch(function() {
@@ -770,6 +890,7 @@
           document.getElementById('view-tasks').classList.contains('active')) {
         engine.syncFromCloud(function(ok) {
           if (ok) {
+            renderGroupTabs();
             if (document.getElementById('view-students').classList.contains('active')) {
               render(searchInput.value);
             } else if (document.getElementById('view-tasks').classList.contains('active')) {
@@ -799,6 +920,7 @@
   const fname = document.getElementById('fname');
   const fclass = document.getElementById('fclass');
   const fstudentId = document.getElementById('fstudentId');
+  const fgroup = document.getElementById('fgroup');
   const fnotes = document.getElementById('fnotes');
 
   let selectionMode = false;
@@ -815,6 +937,11 @@
             || (p.notes || '').toLowerCase().indexOf(q) !== -1;
         })
       : people.slice();
+
+    // Filter by active group
+    if (activeGroup) {
+      filtered = filtered.filter(function(p) { return p.group === activeGroup; });
+    }
 
     // Sort by class, then by name
     filtered.sort(function(a, b) {
@@ -843,6 +970,7 @@
       return '<div class="card' + selClass + isSel + '" data-id="' + p.id + '">'
         + '<div class="cb"></div>'
         + '<div class="name">' + esc(p.name || '(未命名)') + '</div>'
+        + (p.group ? '<span class="group-tag">' + esc(p.group) + '</span>' : '')
         + (infoParts.length ? '<div class="info">' + infoParts.join('') + '</div>' : '')
         + (p.notes ? '<div class="notes">' + esc(p.notes) + '</div>' : '')
         + '</div>';
@@ -864,6 +992,7 @@
     fname.value = person ? person.name : '';
     fclass.value = person ? person.class : '';
     fstudentId.value = person ? person.studentId : '';
+    populateGroupSelect(fgroup, person ? person.group : '');
     fnotes.value = person ? person.notes : '';
     btnDelete.style.display = person ? '' : 'none';
     modal.classList.add('active');
@@ -884,6 +1013,7 @@
       name: name,
       class: fclass.value.trim(),
       studentId: fstudentId.value.trim(),
+      group: fgroup.value,
       notes: fnotes.value.trim(),
       updatedAt: new Date().toISOString()
     };
@@ -942,8 +1072,8 @@
     var list = getSelectedOrAll(people);
     if (list.length === 0) { alert('没有数据可导出'); return; }
     loadXlsx(function() {
-    var rows = [['姓名', '班级', '当前状态', '备注']];
-    list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.notes]); });
+    var rows = [['姓名', '班级', '当前状态', '分组', '备注']];
+    list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.group || '', p.notes]); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '通讯录');
@@ -982,7 +1112,8 @@
     name: ['姓名','名字','名称','学生姓名','学生名字','人员姓名','人员','联系人'],
     class: ['班级','班','班组','年级','专业','系别'],
     studentId: ['学号','当前状态','入党情况','状态','政治面貌','编号'],
-    notes: ['备注','说明','附注','其他','描述','补充']
+    notes: ['备注','说明','附注','其他','描述','补充'],
+    group: ['分组','组','组别','批次']
   };
 
   function norm(s) {
@@ -1011,6 +1142,7 @@
     var classIdx = findCol(headers, colVariants.class);
     var sidIdx = findCol(headers, colVariants.studentId);
     var notesIdx = findCol(headers, colVariants.notes);
+    var groupIdx = findCol(headers, colVariants.group);
 
     if (nameIdx === -1) {
       alert('无法识别表格中的人名列。\n\n检测到的列名：' + headers.join('、') + '\n去除空格后：' + headers.map(norm).join('、') + '\n\n人名列请包含以下关键词之一：' + colVariants.name.join('、'));
@@ -1025,7 +1157,8 @@
         name: (vals[nameIdx] || '').toString().trim(),
         class: classIdx !== -1 ? (vals[classIdx] || '').toString().trim() : '',
         studentId: sidIdx !== -1 ? (vals[sidIdx] || '').toString().trim() : '',
-        notes: notesIdx !== -1 ? (vals[notesIdx] || '').toString().trim() : ''
+        notes: notesIdx !== -1 ? (vals[notesIdx] || '').toString().trim() : '',
+        group: groupIdx !== -1 ? (vals[groupIdx] || '').toString().trim() : ''
       });
     }
     return result;
@@ -1170,6 +1303,122 @@
 
   // Batch operations
   var btnSelect = document.getElementById('btnSelect');
+  // ====== Group tabs ======
+  function renderGroupTabs() {
+    var wrap = document.getElementById('groupTabs');
+    var html = '<span class="group-tab' + (activeGroup === '' ? ' active' : '') + '" data-group="">全部</span>';
+    groups.forEach(function(g) {
+      html += '<span class="group-tab' + (activeGroup === g ? ' active' : '') + '" data-group="' + esc(g) + '">' + esc(g) + '</span>';
+    });
+    wrap.innerHTML = html;
+
+    // Click handlers
+    wrap.querySelectorAll('.group-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        activeGroup = this.getAttribute('data-group');
+        renderGroupTabs();
+        render(searchInput.value);
+      });
+    });
+  }
+
+  function populateGroupSelect(selectEl, selectedVal) {
+    selectEl.innerHTML = '<option value="">无分组</option>';
+    groups.forEach(function(g) {
+      var sel = (selectedVal === g) ? ' selected' : '';
+      selectEl.innerHTML += '<option value="' + esc(g) + '"' + sel + '>' + esc(g) + '</option>';
+    });
+  }
+
+  // ====== Group management modal ======
+  var groupModal = document.getElementById('groupModal');
+  var fNewGroup = document.getElementById('fNewGroup');
+
+  function renderGroupList() {
+    var el = document.getElementById('groupList');
+    if (groups.length === 0) {
+      el.innerHTML = '<div style="color:#999;text-align:center;padding:16px">暂无分组</div>';
+      return;
+    }
+    el.innerHTML = groups.map(function(g, i) {
+      return '<div class="group-item">'
+        + '<span class="group-name">' + esc(g) + '</span>'
+        + '<button class="g-rename" data-idx="' + i + '">改名</button>'
+        + '<button class="g-delete" data-idx="' + i + '">删除</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openGroupModal() {
+    renderGroupList();
+    fNewGroup.value = '';
+    groupModal.classList.add('active');
+  }
+
+  document.getElementById('btnManageGroups').addEventListener('click', openGroupModal);
+
+  document.getElementById('btnGroupCancel').addEventListener('click', function() {
+    groupModal.classList.remove('active');
+  });
+
+  groupModal.addEventListener('click', function(e) {
+    if (e.target === groupModal) groupModal.classList.remove('active');
+  });
+
+  // Add group
+  document.getElementById('btnAddGroup').addEventListener('click', function() {
+    var name = fNewGroup.value.trim();
+    if (!name) return;
+    if (groups.indexOf(name) !== -1) { alert('该分组已存在'); return; }
+    groups.push(name);
+    engine.save();
+    renderGroupList();
+    renderGroupTabs();
+    populateGroupSelect(fgroup, '');
+    fNewGroup.value = '';
+  });
+
+  // Rename / Delete groups (event delegation)
+  document.getElementById('groupList').addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    var idx = parseInt(btn.getAttribute('data-idx'));
+    var old = groups[idx];
+    if (!old) return;
+
+    if (btn.classList.contains('g-delete')) {
+      if (!confirm('删除分组「' + old + '」？\n已有该分组的学生不会受影响。')) return;
+      groups.splice(idx, 1);
+      engine.save();
+      renderGroupList();
+      renderGroupTabs();
+      populateGroupSelect(fgroup, '');
+      render(searchInput.value);
+    }
+
+    if (btn.classList.contains('g-rename')) {
+      var newName = prompt('重命名「' + old + '」为：', old);
+      if (!newName || newName.trim() === old) return;
+      var trimmed = newName.trim();
+      if (groups.indexOf(trimmed) !== -1) { alert('该名称已存在'); return; }
+      groups[idx] = trimmed;
+      // Update all students with old group name
+      people.forEach(function(p) {
+        if (p.group === old) p.group = trimmed;
+      });
+      engine.save();
+      renderGroupList();
+      renderGroupTabs();
+      populateGroupSelect(fgroup, '');
+      render(searchInput.value);
+    }
+  });
+
+  // Enter key in new group input
+  fNewGroup.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('btnAddGroup').click();
+  });
+
   var batchBar = document.getElementById('batchBar');
   var selectedCountEl = document.getElementById('selectedCount');
   var btnSelectAll = document.getElementById('btnSelectAll');
@@ -1240,6 +1489,7 @@
 
   var batchEditFields = [
     { key: 'studentId', label: '当前状态' },
+    { key: 'group', label: '分组' },
     { key: 'class', label: '班级' },
     { key: 'notes', label: '备注' }
   ];
@@ -1269,8 +1519,13 @@
     btnBatchEditApply.style.display = '';
 
     // Toggle between text input and select dropdown
-    if (key === 'studentId') {
+    if (key === 'studentId' || key === 'group') {
       fbatchValue.style.display = 'none';
+      if (key === 'group') {
+        populateGroupSelect(fbatchSelect, '');
+      } else {
+        fbatchSelect.innerHTML = '<option value="">请选择</option><option value="积极分子">积极分子</option><option value="发展对象">发展对象</option><option value="预备党员">预备党员</option><option value="正式党员">正式党员</option>';
+      }
       fbatchSelect.style.display = '';
       fbatchSelect.focus();
     } else {
@@ -1293,7 +1548,7 @@
 
   function applyBatchEdit() {
     if (!batchEditField) { alert('请先选择要修改的字段'); return; }
-    var newValue = (batchEditField === 'studentId' ? fbatchSelect.value : fbatchValue.value.trim());
+    var newValue = (batchEditField === 'studentId' || batchEditField === 'group' ? fbatchSelect.value : fbatchValue.value.trim());
     var ids = Object.keys(selectedIds);
     if (ids.length === 0) return;
 
@@ -1373,6 +1628,7 @@
   // Navigation handlers
   document.getElementById('navStudents').addEventListener('click', function() {
     showView('students');
+    renderGroupTabs();
     render(searchInput.value);
   });
   document.getElementById('navTasks').addEventListener('click', function() {
@@ -1396,7 +1652,7 @@
       return fetch(API_BASE, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: people, tasks: tasks })
+        body: JSON.stringify({ students: people, tasks: tasks, groups: groups })
       });
     }
     function saveAndSync(callback) {
