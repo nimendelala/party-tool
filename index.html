@@ -903,8 +903,34 @@
           }
         });
       }
-    }, 2000);
+    }, 1000);
   }
+
+  // Sync immediately when user switches back to this tab
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && !isEditing) {
+      if (document.getElementById('view-students').classList.contains('active') ||
+          document.getElementById('view-tasks').classList.contains('active')) {
+        engine.syncFromCloud(function(ok) {
+          if (ok) {
+            if (document.getElementById('view-students').classList.contains('active')) {
+              var cur = JSON.stringify(people);
+              if (cur !== lastStudentsJSON) {
+                lastStudentsJSON = cur;
+                render(searchInput.value);
+              }
+            } else if (document.getElementById('view-tasks').classList.contains('active')) {
+              var cur = JSON.stringify(tasks);
+              if (cur !== lastTasksJSON) {
+                lastTasksJSON = cur;
+                renderTasks(taskSearchInput.value);
+              }
+            }
+          }
+        });
+      }
+    }
+  });
 
   function markEditing(on) {
     isEditing = on;
