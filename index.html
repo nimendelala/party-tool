@@ -705,10 +705,21 @@
   let editingId = null;
   let currentVersion = 0;
 
+  // Track locally deleted IDs to prevent resurrection during save merge
+  var recentlyDeleted = {};
+  function markDeleted(id) {
+    recentlyDeleted[id] = Date.now();
+  }
+
   // Merge helper: for each record ID, keep the newer version (by updatedAt)
   function mergeByUpdatedAt(localItems, remoteItems) {
     var merged = {};
-    remoteItems.forEach(function(item) { merged[item.id] = item; });
+    var now = Date.now();
+    remoteItems.forEach(function(item) {
+      // Skip items that were locally deleted within the last 30s
+      if (recentlyDeleted[item.id] && (now - recentlyDeleted[item.id]) < 30000) return;
+      merged[item.id] = item;
+    });
     localItems.forEach(function(item) {
       if (!merged[item.id]) {
         merged[item.id] = item;
@@ -1058,6 +1069,7 @@
   function deletePerson() {
     if (!editingId) return;
     if (!confirm('确定删除该联系人吗？')) return;
+    markDeleted(editingId);
     people = people.filter(function(p) { return p.id !== editingId; });
     engine.saveAndSync(function() { render(searchInput.value); });
     closeModal();
@@ -1424,6 +1436,7 @@
     var ids = Object.keys(selectedIds);
     if (ids.length === 0) { alert('请先选择要删除的学生'); return; }
     if (!confirm('确定删除选中的 ' + ids.length + ' 名学生吗？此操作不可恢复。')) return;
+    ids.forEach(markDeleted);
     people = people.filter(function(p) { return !selectedIds[p.id]; });
     selectedIds = {};
     selectionMode = false;
@@ -1697,6 +1710,7 @@
   function deleteTask() {
     if (!taskEditingId) return;
     if (!confirm('确定删除该任务吗？')) return;
+    markDeleted(taskEditingId);
     tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
     engine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
     closeTaskModal();
@@ -1748,6 +1762,7 @@
       }
       if (action === 'delete') {
         if (!confirm('确定删除该任务吗？')) return;
+        markDeleted(id);
         tasks = tasks.filter(function(t) { return t.id !== id; });
         engine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
         renderTasks(taskSearchInput.value);
