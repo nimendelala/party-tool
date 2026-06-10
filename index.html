@@ -663,23 +663,78 @@
   const API_BASE = '/api/data';
   let people = [];
   let editingId = null;
+  let currentVersion = 0;
+
+  // Merge helper: for each record ID, keep the newer version (by updatedAt)
+  function mergeByUpdatedAt(localItems, remoteItems) {
+    var merged = {};
+    remoteItems.forEach(function(item) { merged[item.id] = item; });
+    localItems.forEach(function(item) {
+      if (!merged[item.id]) {
+        merged[item.id] = item;
+      } else {
+        var localTime = new Date(item.updatedAt || 0).getTime();
+        var remoteTime = new Date(merged[item.id].updatedAt || 0).getTime();
+        if (localTime > remoteTime) merged[item.id] = item;
+      }
+    });
+    var result = [];
+    Object.keys(merged).forEach(function(k) { result.push(merged[k]); });
+    return result;
+  }
 
   // Cloud API storage engine
   var engine = (function() {
-    // Returns a promise so callers can wait for the write to complete
+    // Fetch latest + merge + PUT, with version-check retry
     function save() {
-      return fetch(API_BASE, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: people, tasks: tasks })
-      });
+      return fetch(API_BASE + '?_=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(cloudData) {
+          // Merge local changes with latest cloud data
+          var cloudStudents = cloudData.students || [];
+          var cloudTasks = cloudData.tasks || [];
+          var cloudVersion = cloudData.version || currentVersion;
+
+          people = mergeByUpdatedAt(people, cloudStudents);
+          tasks = mergeByUpdatedAt(tasks, cloudTasks);
+          currentVersion = cloudVersion;
+
+          function doPut(version) {
+            return fetch(API_BASE, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ students: people, tasks: tasks, _version: version })
+            }).then(function(r) {
+              if (r.status === 409) {
+                // Another client saved between our GET and PUT — re-merge and retry once
+                return r.json().then(function(conflict) {
+                  people = mergeByUpdatedAt(people, conflict.students || []);
+                  tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
+                  currentVersion = conflict.version;
+                  return fetch(API_BASE, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ students: people, tasks: tasks, _version: conflict.version })
+                  }).then(function(r) {
+                    return r.json().then(function(d) {
+                      if (d.version) currentVersion = d.version;
+                    });
+                  });
+                });
+              }
+              return r.json().then(function(d) {
+                if (d.version) currentVersion = d.version;
+              });
+            });
+          }
+          return doPut(cloudVersion);
+        });
     }
 
     // Save then double-sync to beat KV eventual consistency lag
     function saveAndSync(callback) {
       save().then(function() {
         engine.syncFromCloud(callback);
-        // Second sync after 1.5s to catch up if first hit a stale edge node
         setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
       }).catch(function() {
         engine.syncFromCloud(callback);
@@ -698,21 +753,21 @@
       fetch(API_BASE + '?_=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          currentVersion = data.version || 0;
           var arr = data.students || data;
           if (Array.isArray(arr) && arr.length > 0) {
             people = arr;
           } else {
-            // Fallback: try localStorage
             try {
               var raw = localStorage.getItem(STORAGE_KEY);
               if (raw) {
                 var parsed = JSON.parse(raw);
                 people = parsed.students || parsed;
-                save();
+                // Don't auto-save here — cloud might be empty legitimately,
+                // and auto-saving old localStorage data would resurrect deletions
               }
             } catch (e) { people = []; }
           }
-          // Load tasks from same response
           if (Array.isArray(data.tasks)) {
             tasks = data.tasks;
           } else {
@@ -742,6 +797,7 @@
       fetch(API_BASE + '?_=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          currentVersion = data.version || currentVersion;
           if (Array.isArray(data.students)) {
             people = data.students;
           }
@@ -1392,34 +1448,12 @@
   var taskEditingId = null;
 
   var taskEngine = (function() {
-    function save() {
-      return fetch(API_BASE, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: people, tasks: tasks })
-      });
-    }
-    function saveAndSync(callback) {
-      save().then(function() {
-        engine.syncFromCloud(callback);
-        setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
-      }).catch(function() {
-        engine.syncFromCloud(callback);
-        setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
-      });
-    }
-    var saveTimer = null;
-    function debouncedSave() {
-      if (saveTimer) clearTimeout(saveTimer);
-      save();
-      saveTimer = setTimeout(function() { save(); }, 500);
-    }
     function loadData(callback) {
       // Tasks are loaded together with students via engine.loadData
       // This just provides the save API, actual loading is in engine.loadData
       callback();
     }
-    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: engine.syncFromCloud, saveAndSync: saveAndSync };
+    return { save: engine.save, debouncedSave: engine.debouncedSave, loadData: loadData, syncFromCloud: engine.syncFromCloud, saveAndSync: engine.saveAndSync };
   })();
 
   // Task render

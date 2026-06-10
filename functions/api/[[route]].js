@@ -21,7 +21,8 @@ export async function onRequest(context) {
       const students = raw ? JSON.parse(raw) : [];
       const tasksRaw = await env.PARTY_DATA.get("tasks");
       const tasks = tasksRaw ? JSON.parse(tasksRaw) : [];
-      return new Response(JSON.stringify({ students: students, tasks: tasks }), {
+      const version = parseInt(await env.PARTY_DATA.get("_version") || "1");
+      return new Response(JSON.stringify({ students: students, tasks: tasks, version: version }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
@@ -35,13 +36,36 @@ export async function onRequest(context) {
   if (path === "/api/data" && request.method === "PUT") {
     try {
       const body = await request.json();
+      const reqVersion = body._version || 0;
+      const rawVersion = await env.PARTY_DATA.get("_version");
+      const storedVersion = parseInt(rawVersion || "1");
+
+      // Version conflict: client save was based on stale data
+      if (reqVersion > 0 && reqVersion < storedVersion) {
+        const conflictStudentsRaw = await env.PARTY_DATA.get("students");
+        const conflictStudents = conflictStudentsRaw ? JSON.parse(conflictStudentsRaw) : [];
+        const conflictTasksRaw = await env.PARTY_DATA.get("tasks");
+        const conflictTasks = conflictTasksRaw ? JSON.parse(conflictTasksRaw) : [];
+        return new Response(JSON.stringify({
+          conflict: true,
+          students: conflictStudents,
+          tasks: conflictTasks,
+          version: storedVersion
+        }), {
+          status: 409,
+          headers: { ...apiHeaders, "Content-Type": "application/json" }
+        });
+      }
+
       if (Array.isArray(body.students)) {
         await env.PARTY_DATA.put("students", JSON.stringify(body.students));
       }
       if (Array.isArray(body.tasks)) {
         await env.PARTY_DATA.put("tasks", JSON.stringify(body.tasks));
       }
-      return new Response(JSON.stringify({ ok: true }), {
+      const newVersion = Math.max(reqVersion, storedVersion) + 1;
+      await env.PARTY_DATA.put("_version", String(newVersion));
+      return new Response(JSON.stringify({ ok: true, version: newVersion }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
