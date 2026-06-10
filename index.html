@@ -2161,32 +2161,51 @@
 
   function renderWorkflows(filter) {
     var q = (filter || '').toLowerCase().trim();
-    var filtered = q
-      ? workflows.filter(function(w) {
-          return (w.title || '').toLowerCase().indexOf(q) !== -1
-            || w.articles.some(function(a) {
-                return (a.title || '').toLowerCase().indexOf(q) !== -1
-                  || (a.content || '').toLowerCase().indexOf(q) !== -1;
-              });
-        })
-      : workflows.slice();
+    var displayList = [];
+    var totalMatch = 0;
 
-    filtered.sort(function(a, b) {
-      return (a.title || '').trim().localeCompare((b.title || '').trim(), 'zh');
+    if (q) {
+      workflows.forEach(function(w) {
+        var catTitleMatch = (w.title || '').toLowerCase().indexOf(q) !== -1;
+        var matchedArticles = (w.articles || []).filter(function(a) {
+          return (a.title || '').toLowerCase().indexOf(q) !== -1
+            || (a.content || '').toLowerCase().indexOf(q) !== -1;
+        });
+        if (catTitleMatch || matchedArticles.length > 0) {
+          displayList.push({
+            category: w,
+            showAll: catTitleMatch,
+            matched: matchedArticles
+          });
+          totalMatch += catTitleMatch ? (w.articles || []).length : matchedArticles.length;
+        }
+      });
+    } else {
+      workflows.forEach(function(w) {
+        displayList.push({ category: w, showAll: true, matched: (w.articles || []) });
+      });
+      totalMatch = workflows.reduce(function(sum, w) { return sum + (w.articles || []).length; }, 0);
+    }
+
+    displayList.sort(function(a, b) {
+      return (a.category.title || '').trim().localeCompare((b.category.title || '').trim(), 'zh');
     });
 
-    workflowCountEl.textContent = '共 ' + filtered.length + ' 个分类'
-      + (q ? '（搜索结果，已自动展开）' : '');
+    workflowCountEl.textContent = q
+      ? '共找到 ' + totalMatch + ' 篇文章（' + displayList.length + ' 个分类）'
+      : '共 ' + displayList.length + ' 个分类';
 
-    if (filtered.length === 0) {
-      workflowListEl.innerHTML = '<div class="empty"><div class="icon">📖</div>还没有分类，点击上方按钮添加</div>';
+    if (displayList.length === 0) {
+      workflowListEl.innerHTML = '<div class="empty"><div class="icon">📖</div>' + (q ? '未找到匹配的文章' : '还没有分类，点击上方按钮添加') + '</div>';
       return;
     }
 
-    workflowListEl.innerHTML = filtered.map(function(w) {
+    workflowListEl.innerHTML = displayList.map(function(d) {
+      var w = d.category;
       var openClass = (q || expandedWf[w.id]) ? ' open' : '';
       var arrowClass = (q || expandedWf[w.id]) ? ' open' : '';
-      var articlesHtml = (w.articles || []).map(function(a) {
+      var articlesToShow = d.showAll ? (w.articles || []) : d.matched;
+      var articlesHtml = articlesToShow.map(function(a) {
         return '<div class="wf-article-item" data-action="viewArt" data-cat="' + w.id + '" data-art="' + a.id + '">'
           + '<span class="wf-article-icon">📄</span>'
           + '<span class="wf-article-title">' + esc(a.title || '(未命名)') + '</span>'
@@ -2204,7 +2223,7 @@
         + '</div>'
         + '<div class="wf-articles' + openClass + '">'
         + articlesHtml
-        + '<div class="wf-article-add" data-action="addArt" data-cat="' + w.id + '">+ 添加文章</div>'
+        + (q && !d.showAll ? '' : '<div class="wf-article-add" data-action="addArt" data-cat="' + w.id + '">+ 添加文章</div>')
         + '</div>'
         + '</div>';
     }).join('');
