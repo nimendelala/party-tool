@@ -747,8 +747,17 @@
 
   // Cloud API storage engine
   var engine = (function() {
+    // Backup current state to localStorage (prevents loss on refresh before save completes)
+    function backupLocal() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ students: people }));
+        localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify({ tasks: tasks }));
+      } catch(e) {}
+    }
+
     // Fetch latest + merge + PUT, with version-check retry
     function save() {
+      backupLocal();
       return fetch(API_BASE + '?_=' + Date.now(), { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(cloudData) {
@@ -845,6 +854,22 @@
           var arr = data.students || data;
           if (Array.isArray(arr) && arr.length > 0) {
             people = arr;
+            // Merge localStorage-only items created recently (unsaved due to refresh)
+            try {
+              var raw = localStorage.getItem(STORAGE_KEY);
+              if (raw) {
+                var local = JSON.parse(raw);
+                var localStudents = (local && local.students) ? local.students : (Array.isArray(local) ? local : []);
+                var now = Date.now();
+                localStudents.forEach(function(item) {
+                  if (!item.id || !item.updatedAt) return;
+                  var existsInCloud = people.some(function(p) { return p.id === item.id; });
+                  if (!existsInCloud && (now - new Date(item.updatedAt).getTime()) < 30000) {
+                    people.push(item);
+                  }
+                });
+              }
+            } catch(e) {}
           } else {
             try {
               var raw = localStorage.getItem(STORAGE_KEY);
@@ -858,6 +883,21 @@
           }
           if (Array.isArray(data.tasks)) {
             tasks = data.tasks;
+            try {
+              var tr = localStorage.getItem(TASK_STORAGE_KEY);
+              if (tr) {
+                var tlocal = JSON.parse(tr);
+                var localTasks = (tlocal && tlocal.tasks) ? tlocal.tasks : [];
+                var now = Date.now();
+                localTasks.forEach(function(item) {
+                  if (!item.id || !item.updatedAt) return;
+                  var existsInCloud = tasks.some(function(t) { return t.id === item.id; });
+                  if (!existsInCloud && (now - new Date(item.updatedAt).getTime()) < 30000) {
+                    tasks.push(item);
+                  }
+                });
+              }
+            } catch(e) {}
           } else {
             try {
               var tr = localStorage.getItem(TASK_STORAGE_KEY);
