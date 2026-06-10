@@ -816,10 +816,10 @@
         .then(function(data) {
           currentVersion = data.version || currentVersion;
           if (Array.isArray(data.students)) {
-            people = data.students;
+            people = mergeByUpdatedAt(people, data.students);
           }
           if (Array.isArray(data.tasks)) {
-            tasks = data.tasks;
+            tasks = mergeByUpdatedAt(tasks, data.tasks);
           }
           if (callback) callback(true);
         })
@@ -1651,9 +1651,13 @@
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
       renderTasks(taskSearchInput.value);
+      markEditing(true);
       if (toggleSaveTimer) clearTimeout(toggleSaveTimer);
       toggleSaveTimer = setTimeout(function() {
-        engine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
+        engine.saveAndSync(function() {
+          markEditing(false);
+          renderTasks(taskSearchInput.value);
+        });
       }, 400);
     }
   }
