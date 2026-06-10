@@ -2286,10 +2286,12 @@
   var wfModalDelete = document.getElementById('wfModalDelete');
   var editingCatId = null;
   var editingArtId = null;
+  var isAddingArticle = false;
 
   function openWfCatEditor(cat) {
     editingCatId = cat ? cat.id : null;
     editingArtId = null;
+    isAddingArticle = false;
     wfModalTitle.textContent = cat ? '编辑分类' : '新建分类';
     wfLabel1.textContent = '分类名称';
     wfContentGroup.style.display = 'none';
@@ -2303,6 +2305,7 @@
   function openWfArticleEditor(catId, art) {
     editingCatId = catId;
     editingArtId = art ? art.id : null;
+    isAddingArticle = !art;
     wfModalTitle.textContent = art ? '编辑文章' : '添加文章';
     wfLabel1.textContent = '文章标题';
     wfContentGroup.style.display = '';
@@ -2317,6 +2320,7 @@
     wfModal.classList.remove('active');
     editingCatId = null;
     editingArtId = null;
+    isAddingArticle = false;
   }
 
   function saveWf() {
@@ -2324,7 +2328,7 @@
     if (!title) { alert('请填写名称'); return; }
 
     if (editingArtId) {
-      // Edit article
+      // Edit existing article
       var cat = workflows.find(function(w) { return w.id === editingCatId; });
       if (!cat) return;
       if (!cat.articles) cat.articles = [];
@@ -2342,10 +2346,23 @@
       }
       cat.updatedAt = new Date().toISOString();
       engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
-      // Also update content view if open
       if (document.getElementById('view-wf-content').classList.contains('active')) {
         showWfContent(editingCatId, editingArtId);
       }
+    } else if (isAddingArticle) {
+      // Add new article to category
+      var cat = workflows.find(function(w) { return w.id === editingCatId; });
+      if (!cat) return;
+      if (!cat.articles) cat.articles = [];
+      var newArt = {
+        id: genId(),
+        title: title,
+        content: fwfContent.value.trim(),
+        updatedAt: new Date().toISOString()
+      };
+      cat.articles.push(newArt);
+      cat.updatedAt = new Date().toISOString();
+      engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
     } else if (editingCatId) {
       // Edit category title
       var cat = workflows.find(function(w) { return w.id === editingCatId; });
