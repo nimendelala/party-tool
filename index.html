@@ -635,6 +635,22 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="exportFieldModal">
+  <div class="modal">
+    <h3>选择导出字段</h3>
+    <div class="form-group" style="text-align:left">
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expName" checked> 姓名</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expClass" checked> 班级</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expStatus" checked> 当前状态</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expNotes" checked> 备注</label>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="btnExportFieldCancel">取消</button>
+      <button class="btn-save" id="btnExportFieldConfirm">导出</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="taskModal">
   <div class="modal">
     <h3 id="taskModalTitle">添加任务</h3>
@@ -1009,20 +1025,57 @@
   }
 
   // Excel export
+  var exportList = [];
   document.getElementById('btnExportCsv').addEventListener('click', function() {
-    var list = getSelectedOrAll(people);
-    if (list.length === 0) { alert('没有数据可导出'); return; }
+    exportList = getSelectedOrAll(people);
+    if (exportList.length === 0) { alert('没有数据可导出'); return; }
+    document.getElementById('exportFieldModal').classList.add('active');
+  });
+
+  // Export field modal: cancel
+  document.getElementById('btnExportFieldCancel').addEventListener('click', function() {
+    document.getElementById('exportFieldModal').classList.remove('active');
+    exportList = [];
+  });
+  document.getElementById('exportFieldModal').addEventListener('click', function(e) {
+    if (e.target === this) { this.classList.remove('active'); exportList = []; }
+  });
+
+  // Export field modal: confirm
+  document.getElementById('btnExportFieldConfirm').addEventListener('click', function() {
+    var incName = document.getElementById('expName').checked;
+    var incClass = document.getElementById('expClass').checked;
+    var incStatus = document.getElementById('expStatus').checked;
+    var incNotes = document.getElementById('expNotes').checked;
+
+    var headers = [];
+    if (incName) headers.push('姓名');
+    if (incClass) headers.push('班级');
+    if (incStatus) headers.push('当前状态');
+    if (incNotes) headers.push('备注');
+    if (headers.length === 0) { alert('请至少选择一个字段'); return; }
+
     loadXlsx(function() {
-    var rows = [['姓名', '班级', '当前状态', '备注']];
-    list.forEach(function(p) { rows.push([p.name, p.class, p.studentId, p.notes]); });
-    var ws = XLSX.utils.aoa_to_sheet(rows);
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '通讯录');
-    var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'contacts-' + new Date().toISOString().slice(0,10) + '.xlsx');
-    selectedIds = {};
-    if (selectionMode) render(searchInput.value);
-  }); // end loadXlsx
+      var rows = [headers];
+      exportList.forEach(function(p) {
+        var row = [];
+        if (incName) row.push(p.name);
+        if (incClass) row.push(p.class);
+        if (incStatus) row.push(p.studentId);
+        if (incNotes) row.push(p.notes);
+        rows.push(row);
+      });
+      var ws = XLSX.utils.aoa_to_sheet(rows);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '通讯录');
+      var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'contacts-' + new Date().toISOString().slice(0,10) + '.xlsx');
+      selectedIds = {};
+      if (selectionMode) render(searchInput.value);
+    });
+
+    document.getElementById('exportFieldModal').classList.remove('active');
+    exportList = [];
   });
 
   // Import (CSV + JSON)
