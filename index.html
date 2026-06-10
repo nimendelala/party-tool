@@ -2514,6 +2514,18 @@
 
   // ====== Auth ======
 
+  function checkSession() {
+    return sessionStorage.getItem('party_session') === '1';
+  }
+
+  function setSession() {
+    sessionStorage.setItem('party_session', '1');
+  }
+
+  function clearSession() {
+    sessionStorage.removeItem('party_session');
+  }
+
   // Login
   document.getElementById('loginBtn').addEventListener('click', function() {
     var pw = document.getElementById('loginPassword').value.trim();
@@ -2529,6 +2541,7 @@
     }).then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.ok) {
+          setSession();
           document.getElementById('loginError').style.display = 'none';
           document.getElementById('loginPassword').value = '';
           engine.loadData(function() {
@@ -2556,6 +2569,7 @@
 
   // Logout
   document.getElementById('btnLogout').addEventListener('click', function() {
+    clearSession();
     people = [];
     tasks = [];
     workflows = [];
@@ -2598,7 +2612,12 @@
   });
 
   // ====== Init ======
-  showView('login');
+  if (checkSession()) {
+    showView('home');
+    engine.loadData(function() {});
+  } else {
+    showView('login');
+  }
 })();
 </script>
 <script>// Unregister old PWA service worker
