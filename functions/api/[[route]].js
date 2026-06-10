@@ -16,15 +16,27 @@ export async function onRequest(context) {
 
   // --- D1 helpers ---
 
+  // One-time migration: add workflows column
+  let migrated = false;
+  async function ensureWorkflowsColumn() {
+    if (migrated) return;
+    try {
+      await env.DB.prepare('ALTER TABLE app_data ADD COLUMN workflows TEXT NOT NULL DEFAULT \'[]\'').run();
+    } catch(e) { /* column already exists */ }
+    migrated = true;
+  }
+
   async function readData() {
+    await ensureWorkflowsColumn();
     const row = await env.DB.prepare(
-      'SELECT students, tasks, version FROM app_data WHERE id = 1'
+      'SELECT students, tasks, workflows, version FROM app_data WHERE id = 1'
     ).first();
 
     if (row) {
       return {
         students: JSON.parse(row.students || '[]'),
         tasks: JSON.parse(row.tasks || '[]'),
+        workflows: JSON.parse(row.workflows || '[]'),
         version: row.version || 1
       };
     }
@@ -50,17 +62,17 @@ export async function onRequest(context) {
 
       if (students.length > 0 || tasks.length > 0) {
         await env.DB.prepare(
-          'INSERT OR REPLACE INTO app_data (id, students, tasks, version) VALUES (1, ?, ?, ?)'
-        ).bind(JSON.stringify(students), JSON.stringify(tasks), version).run();
+          'INSERT OR REPLACE INTO app_data (id, students, tasks, workflows, version) VALUES (1, ?, ?, ?, ?)'
+        ).bind(JSON.stringify(students), JSON.stringify(tasks), '[]', version).run();
       } else {
         await env.DB.prepare(
-          'INSERT OR IGNORE INTO app_data (id, students, tasks, version) VALUES (1, ?, ?, ?)'
-        ).bind('[]', '[]', 1).run();
+          'INSERT OR IGNORE INTO app_data (id, students, tasks, workflows, version) VALUES (1, ?, ?, ?, ?)'
+        ).bind('[]', '[]', '[]', 1).run();
       }
 
-      return { students, tasks, version };
+      return { students, tasks, workflows: [], version };
     } catch (e) {
-      return { students: [], tasks: [], version: 1 };
+      return { students: [], tasks: [], workflows: [], version: 1 };
     }
   }
 
@@ -72,7 +84,7 @@ export async function onRequest(context) {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
-      return new Response(JSON.stringify({ students: [], tasks: [], version: 1 }), {
+      return new Response(JSON.stringify({ students: [], tasks: [], workflows: [], version: 1 }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     }
@@ -92,6 +104,7 @@ export async function onRequest(context) {
           conflict: true,
           students: current.students,
           tasks: current.tasks,
+          workflows: current.workflows,
           version: storedVersion
         }), {
           status: 409,
@@ -106,27 +119,32 @@ export async function onRequest(context) {
       const tasks = JSON.stringify(
         Array.isArray(body.tasks) ? body.tasks : current.tasks
       );
+      const workflows = JSON.stringify(
+        Array.isArray(body.workflows) ? body.workflows : current.workflows
+      );
 
       // Optimistic locking: only update if version hasn't changed
       const result = await env.DB.prepare(
-        'UPDATE app_data SET students = ?, tasks = ?, version = ? WHERE id = 1 AND version = ?'
-      ).bind(students, tasks, newVersion, storedVersion).run();
+        'UPDATE app_data SET students = ?, tasks = ?, workflows = ?, version = ? WHERE id = 1 AND version = ?'
+      ).bind(students, tasks, workflows, newVersion, storedVersion).run();
 
       if (result.changes === 0) {
         // Race: another request updated between our read and write
         const fresh = await env.DB.prepare(
-          'SELECT students, tasks, version FROM app_data WHERE id = 1'
+          'SELECT students, tasks, workflows, version FROM app_data WHERE id = 1'
         ).first();
         const freshData = fresh ? {
           students: JSON.parse(fresh.students || '[]'),
           tasks: JSON.parse(fresh.tasks || '[]'),
+          workflows: JSON.parse(fresh.workflows || '[]'),
           version: fresh.version || 1
-        } : { students: [], tasks: [], version: 1 };
+        } : { students: [], tasks: [], workflows: [], version: 1 };
 
         return new Response(JSON.stringify({
           conflict: true,
           students: freshData.students,
           tasks: freshData.tasks,
+          workflows: freshData.workflows,
           version: freshData.version
         }), {
           status: 409,

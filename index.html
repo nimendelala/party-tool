@@ -337,6 +337,7 @@
   .home-card .card-subtitle { font-size: 13px; color: #999; }
   .home-card.card-students { border-color: #c0392b; }
   .home-card.card-tasks { border-color: #2980b9; }
+  .home-card.card-workflows { border-color: #8e44ad; }
 
   /* Task list */
   .task-count {
@@ -414,6 +415,120 @@
     flex-shrink: 0;
   }
   .task-card .task-delete:active { color: #e74c3c; }
+
+  /* Workflow */
+  .wf-card {
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .wf-card-header {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .wf-card-header:active { background: #f9f9f9; }
+  .wf-card-header .wf-arrow {
+    font-size: 12px;
+    color: #aaa;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .wf-card-header .wf-arrow.open { transform: rotate(90deg); }
+  .wf-card-header .wf-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .wf-card-header .wf-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .wf-card-header .wf-actions button {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #888;
+    transition: all 0.15s;
+  }
+  .wf-card-header .wf-actions button:active { background: #f0f0f0; }
+  .wf-card-header .wf-edit-btn { }
+  .wf-card-header .wf-del-btn:active { color: #e74c3c; border-color: #e74c3c; }
+  .wf-articles {
+    display: none;
+    border-top: 1px solid #f0f0f0;
+    padding: 8px 0;
+  }
+  .wf-articles.open { display: block; }
+  .wf-article-item {
+    padding: 10px 16px 10px 40px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #444;
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .wf-article-item:active { background: #f5f5f5; }
+  .wf-article-item .wf-article-icon { color: #aaa; font-size: 14px; flex-shrink: 0; }
+  .wf-article-item .wf-article-title { flex: 1; }
+  .wf-article-add {
+    padding: 10px 16px 10px 40px;
+    font-size: 14px;
+    color: #8e44ad;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.1s;
+  }
+  .wf-article-add:active { background: #f5f5f5; }
+  .workflow-count { font-size: 13px; color: #999; margin-bottom: 8px; }
+
+  /* Workflow content viewer */
+  .wf-viewer-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #333;
+  }
+  .wf-viewer-category {
+    font-size: 13px;
+    color: #8e44ad;
+    margin-bottom: 16px;
+  }
+  .wf-viewer-content {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #444;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .wf-viewer-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .wf-viewer-actions button {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+    color: #555;
+  }
+  .wf-viewer-actions button:active { background: #f0f0f0; }
 
   /* Login */
   .login-card {
@@ -536,6 +651,11 @@
         <div class="card-title">工作列表</div>
         <div class="card-subtitle">查看和管理待办工作任务</div>
       </div>
+      <div class="home-card card-workflows" id="navWorkflows">
+        <div class="card-icon">📖</div>
+        <div class="card-title">工作流程</div>
+        <div class="card-subtitle">工作事项分类与详细操作说明</div>
+      </div>
     </div>
     <div class="home-actions">
       <button class="home-btn btn-changepw" id="btnChangePw">修改密码</button>
@@ -581,6 +701,26 @@
     </div>
     <div class="task-count" id="taskCount"></div>
     <div class="list" id="taskList"></div>
+  </div>
+
+  <!-- ====== Workflows View ====== -->
+  <div id="view-workflows" class="view">
+    <button class="back-btn" id="backFromWorkflows">← 返回首页</button>
+    <div class="search-bar">
+      <input type="text" id="wfSearchInput" placeholder="搜索...">
+    </div>
+    <button class="add-btn" id="wfAddBtn">+ 新建分类</button>
+    <div class="toolbar">
+      <button class="btn-refresh" id="btnRefreshWorkflows">刷新</button>
+    </div>
+    <div class="workflow-count" id="workflowCount"></div>
+    <div class="list" id="workflowList"></div>
+  </div>
+
+  <!-- ====== Workflow Content View ====== -->
+  <div id="view-wf-content" class="view">
+    <button class="back-btn" id="wfContentBack">← 返回工作流程</button>
+    <div id="wfContentBody"></div>
   </div>
 
 </div>
@@ -697,6 +837,42 @@
   </div>
 </div>
 
+<!-- Workflow: password confirmation -->
+<div class="modal-overlay" id="wfPwModal">
+  <div class="modal">
+    <h3>验证身份</h3>
+    <p style="font-size:13px;color:#888;margin-bottom:12px;text-align:center">编辑或删除操作需要验证密码</p>
+    <div class="form-group">
+      <input type="password" id="wfPwInput" placeholder="请输入登录密码">
+    </div>
+    <p class="login-error" id="wfPwError" style="display:none;font-size:13px">密码错误</p>
+    <div class="form-actions">
+      <button class="btn-cancel" id="wfPwCancel">取消</button>
+      <button class="btn-save" id="wfPwConfirm">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Workflow: category/article editor -->
+<div class="modal-overlay" id="wfModal">
+  <div class="modal">
+    <h3 id="wfModalTitle">新建分类</h3>
+    <div class="form-group">
+      <label id="wfLabel1">名称</label>
+      <input type="text" id="fwfTitle" placeholder="请输入名称">
+    </div>
+    <div class="form-group" id="wfContentGroup" style="display:none">
+      <label>内容</label>
+      <textarea id="fwfContent" placeholder="请输入详细内容" style="min-height:200px"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="wfModalCancel">取消</button>
+      <button class="btn-delete" id="wfModalDelete" style="display:none">删除</button>
+      <button class="btn-save" id="wfModalSave">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   const STORAGE_KEY = 'contact_app_data';
@@ -752,6 +928,7 @@
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ students: people }));
         localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify({ tasks: tasks }));
+        localStorage.setItem(WFLOW_STORAGE_KEY, JSON.stringify({ workflows: workflows }));
       } catch(e) {}
     }
 
@@ -764,6 +941,7 @@
           // Merge local changes with latest cloud data
           var cloudStudents = cloudData.students || [];
           var cloudTasks = cloudData.tasks || [];
+          var cloudWorkflows = cloudData.workflows || [];
           var cloudVersion = cloudData.version || currentVersion;
 
           markCloudSeen(cloudStudents);
@@ -771,6 +949,7 @@
 
           people = mergeByUpdatedAt(people, cloudStudents);
           tasks = mergeByUpdatedAt(tasks, cloudTasks);
+          workflows = mergeByUpdatedAt(workflows, cloudWorkflows);
           currentVersion = cloudVersion;
 
           function doPut(version) {
@@ -778,7 +957,7 @@
               cache: 'no-store',
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ students: people, tasks: tasks, _version: version })
+              body: JSON.stringify({ students: people, tasks: tasks, workflows: workflows, _version: version })
             }).then(function(r) {
               if (r.status === 409) {
                 // Another client saved between our GET and PUT — re-merge and retry once
@@ -787,12 +966,13 @@
                   markCloudSeen(conflict.tasks || []);
                   people = mergeByUpdatedAt(people, conflict.students || []);
                   tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
+                  workflows = mergeByUpdatedAt(workflows, conflict.workflows || []);
                   currentVersion = conflict.version;
                   return fetch(API_BASE, {
                     cache: 'no-store',
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ students: people, tasks: tasks, _version: conflict.version })
+                    body: JSON.stringify({ students: people, tasks: tasks, workflows: workflows, _version: conflict.version })
                   }).then(function(r) {
                     return r.json().then(function(d) {
                       if (d.version) currentVersion = d.version;
@@ -904,6 +1084,29 @@
               if (tr) { var tp = JSON.parse(tr); tasks = tp.tasks || []; }
             } catch (e) { tasks = []; }
           }
+          if (Array.isArray(data.workflows)) {
+            workflows = data.workflows;
+            try {
+              var wr = localStorage.getItem(WFLOW_STORAGE_KEY);
+              if (wr) {
+                var wlocal = JSON.parse(wr);
+                var localWfs = (wlocal && wlocal.workflows) ? wlocal.workflows : [];
+                var tnow = Date.now();
+                localWfs.forEach(function(item) {
+                  if (!item.id || !item.updatedAt) return;
+                  var existsInCloud = workflows.some(function(w) { return w.id === item.id; });
+                  if (!existsInCloud && (tnow - new Date(item.updatedAt).getTime()) < 30000) {
+                    workflows.push(item);
+                  }
+                });
+              }
+            } catch(e) {}
+          } else {
+            try {
+              var wr = localStorage.getItem(WFLOW_STORAGE_KEY);
+              if (wr) { var wp = JSON.parse(wr); workflows = wp.workflows || []; }
+            } catch(e) { workflows = []; }
+          }
           callback();
         })
         .catch(function() {
@@ -934,6 +1137,9 @@
           if (Array.isArray(data.tasks)) {
             tasks = mergeByUpdatedAt(tasks, data.tasks);
           }
+          if (Array.isArray(data.workflows)) {
+            workflows = mergeByUpdatedAt(workflows, data.workflows);
+          }
           if (callback) callback(true);
         })
         .catch(function() {
@@ -947,6 +1153,7 @@
   // Last rendered snapshots for diff detection
   var lastStudentsJSON = '';
   var lastTasksJSON = '';
+  var lastWorkflowsJSON = '';
 
   // Auto-sync timer (every 2 seconds when not editing)
   var syncTimer = null;
@@ -957,7 +1164,8 @@
     syncTimer = setInterval(function() {
       if (isEditing) return;
       if (document.getElementById('view-students').classList.contains('active') ||
-          document.getElementById('view-tasks').classList.contains('active')) {
+          document.getElementById('view-tasks').classList.contains('active') ||
+          document.getElementById('view-workflows').classList.contains('active')) {
         engine.syncFromCloud(function(ok) {
           if (ok) {
             if (document.getElementById('view-students').classList.contains('active')) {
@@ -971,6 +1179,12 @@
               if (cur !== lastTasksJSON) {
                 lastTasksJSON = cur;
                 renderTasks(taskSearchInput.value);
+              }
+            } else if (document.getElementById('view-workflows').classList.contains('active')) {
+              var curW = JSON.stringify(workflows);
+              if (curW !== lastWorkflowsJSON) {
+                lastWorkflowsJSON = curW;
+                renderWorkflows(wfSearchInput ? wfSearchInput.value : '');
               }
             }
           }
@@ -983,7 +1197,8 @@
   document.addEventListener('visibilitychange', function() {
     if (!document.hidden && !isEditing) {
       if (document.getElementById('view-students').classList.contains('active') ||
-          document.getElementById('view-tasks').classList.contains('active')) {
+          document.getElementById('view-tasks').classList.contains('active') ||
+          document.getElementById('view-workflows').classList.contains('active')) {
         engine.syncFromCloud(function(ok) {
           if (ok) {
             if (document.getElementById('view-students').classList.contains('active')) {
@@ -997,6 +1212,12 @@
               if (cur !== lastTasksJSON) {
                 lastTasksJSON = cur;
                 renderTasks(taskSearchInput.value);
+              }
+            } else if (document.getElementById('view-workflows').classList.contains('active')) {
+              var curW = JSON.stringify(workflows);
+              if (curW !== lastWorkflowsJSON) {
+                lastWorkflowsJSON = curW;
+                renderWorkflows(wfSearchInput ? wfSearchInput.value : '');
               }
             }
           }
@@ -1630,6 +1851,11 @@
         pwModal.classList.remove('active');
       } else if (batchEditModal.classList.contains('active')) {
         closeBatchEditModal();
+      } else if (wfPwModal && wfPwModal.classList.contains('active')) {
+        wfPwModal.classList.remove('active');
+        wfPendingAction = null;
+      } else if (wfModal && wfModal.classList.contains('active')) {
+        closeWfModal();
       } else if (taskModal && taskModal.classList.contains('active')) {
         closeTaskModal();
       } else if (modal.classList.contains('active')) {
@@ -1660,6 +1886,14 @@
     showView('home');
   });
   document.getElementById('backFromTasks').addEventListener('click', function() {
+    showView('home');
+  });
+
+  document.getElementById('navWorkflows').addEventListener('click', function() {
+    showView('workflows');
+    renderWorkflows(wfSearchInput ? wfSearchInput.value : '');
+  });
+  document.getElementById('backFromWorkflows').addEventListener('click', function() {
     showView('home');
   });
 
@@ -1898,6 +2132,341 @@
     markEditing(false);
     origCloseBatch();
   };
+
+  // ====== Workflow Module ======
+  var WFLOW_STORAGE_KEY = 'workflow_app_data';
+  var workflows = [];
+  var expandedWf = {};
+  var wfPendingAction = null;
+
+  // --- Render ---
+  var workflowListEl = document.getElementById('workflowList');
+  var workflowCountEl = document.getElementById('workflowCount');
+  var wfSearchInput = document.getElementById('wfSearchInput');
+
+  function renderWorkflows(filter) {
+    var q = (filter || '').toLowerCase().trim();
+    var filtered = q
+      ? workflows.filter(function(w) {
+          return (w.title || '').toLowerCase().indexOf(q) !== -1
+            || w.articles.some(function(a) {
+                return (a.title || '').toLowerCase().indexOf(q) !== -1
+                  || (a.content || '').toLowerCase().indexOf(q) !== -1;
+              });
+        })
+      : workflows.slice();
+
+    filtered.sort(function(a, b) {
+      return (a.title || '').trim().localeCompare((b.title || '').trim(), 'zh');
+    });
+
+    workflowCountEl.textContent = '共 ' + filtered.length + ' 个分类'
+      + (q ? '（搜索结果，已自动展开）' : '');
+
+    if (filtered.length === 0) {
+      workflowListEl.innerHTML = '<div class="empty"><div class="icon">📖</div>还没有分类，点击上方按钮添加</div>';
+      return;
+    }
+
+    workflowListEl.innerHTML = filtered.map(function(w) {
+      var openClass = (q || expandedWf[w.id]) ? ' open' : '';
+      var arrowClass = (q || expandedWf[w.id]) ? ' open' : '';
+      var articlesHtml = (w.articles || []).map(function(a) {
+        return '<div class="wf-article-item" data-action="viewArt" data-cat="' + w.id + '" data-art="' + a.id + '">'
+          + '<span class="wf-article-icon">📄</span>'
+          + '<span class="wf-article-title">' + esc(a.title || '(未命名)') + '</span>'
+          + '</div>';
+      }).join('');
+
+      return '<div class="wf-card">'
+        + '<div class="wf-card-header" data-action="toggleWf" data-cat="' + w.id + '">'
+        + '<span class="wf-arrow' + arrowClass + '">▶</span>'
+        + '<span class="wf-title">' + esc(w.title) + '</span>'
+        + '<span class="wf-actions">'
+        + '<button class="wf-edit-btn" data-action="editCat" data-cat="' + w.id + '">编辑</button>'
+        + '<button class="wf-del-btn" data-action="delCat" data-cat="' + w.id + '">删除</button>'
+        + '</span>'
+        + '</div>'
+        + '<div class="wf-articles' + openClass + '">'
+        + articlesHtml
+        + '<div class="wf-article-add" data-action="addArt" data-cat="' + w.id + '">+ 添加文章</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // --- Content viewer ---
+  function showWfContent(catId, artId) {
+    var cat = workflows.find(function(w) { return w.id === catId; });
+    if (!cat) return;
+    var art = (cat.articles || []).find(function(a) { return a.id === artId; });
+    if (!art) return;
+    showView('wf-content');
+    document.getElementById('wfContentBody').innerHTML =
+      '<div class="wf-viewer-title">' + esc(art.title) + '</div>'
+      + '<div class="wf-viewer-category">📁 ' + esc(cat.title) + '</div>'
+      + '<div class="wf-viewer-content">' + esc(art.content || '') + '</div>'
+      + '<div class="wf-viewer-actions">'
+      + '<button id="wfContentEdit" data-cat="' + catId + '" data-art="' + artId + '">编辑此文章</button>'
+      + '<button id="wfContentDel" data-cat="' + catId + '" data-art="' + artId + '">删除此文章</button>'
+      + '</div>';
+
+    document.getElementById('wfContentEdit').addEventListener('click', function() {
+      wfRequirePw(function() {
+        openWfArticleEditor(catId, artId);
+      });
+    });
+    document.getElementById('wfContentDel').addEventListener('click', function() {
+      wfRequirePw(function() {
+        deleteWfArticle(catId, artId);
+      });
+    });
+  }
+
+  document.getElementById('wfContentBack').addEventListener('click', function() {
+    showView('workflows');
+    renderWorkflows(wfSearchInput.value);
+  });
+
+  // --- Password gate ---
+  function wfRequirePw(action) {
+    document.getElementById('wfPwInput').value = '';
+    document.getElementById('wfPwError').style.display = 'none';
+    wfPendingAction = action;
+    document.getElementById('wfPwModal').classList.add('active');
+    document.getElementById('wfPwInput').focus();
+  }
+
+  document.getElementById('wfPwCancel').addEventListener('click', function() {
+    document.getElementById('wfPwModal').classList.remove('active');
+    wfPendingAction = null;
+  });
+  document.getElementById('wfPwModal').addEventListener('click', function(e) {
+    if (e.target === this) { this.classList.remove('active'); wfPendingAction = null; }
+  });
+  document.getElementById('wfPwConfirm').addEventListener('click', function() {
+    var pw = document.getElementById('wfPwInput').value.trim();
+    if (!pw) return;
+    var btn = this;
+    btn.textContent = '验证中...';
+    btn.disabled = true;
+    fetch('/api/auth', {
+      cache: 'no-store',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.textContent = '确认';
+        btn.disabled = false;
+        if (data.ok) {
+          document.getElementById('wfPwModal').classList.remove('active');
+          var action = wfPendingAction;
+          wfPendingAction = null;
+          if (action) action();
+        } else {
+          document.getElementById('wfPwError').style.display = '';
+          document.getElementById('wfPwInput').value = '';
+        }
+      })
+      .catch(function() {
+        btn.textContent = '确认';
+        btn.disabled = false;
+        document.getElementById('wfPwError').style.display = '';
+      });
+  });
+
+  // --- Category CRUD ---
+  var wfModal = document.getElementById('wfModal');
+  var wfModalTitle = document.getElementById('wfModalTitle');
+  var wfLabel1 = document.getElementById('wfLabel1');
+  var wfContentGroup = document.getElementById('wfContentGroup');
+  var fwfTitle = document.getElementById('fwfTitle');
+  var fwfContent = document.getElementById('fwfContent');
+  var wfModalDelete = document.getElementById('wfModalDelete');
+  var editingCatId = null;
+  var editingArtId = null;
+
+  function openWfCatEditor(cat) {
+    editingCatId = cat ? cat.id : null;
+    editingArtId = null;
+    wfModalTitle.textContent = cat ? '编辑分类' : '新建分类';
+    wfLabel1.textContent = '分类名称';
+    wfContentGroup.style.display = 'none';
+    fwfTitle.value = cat ? cat.title : '';
+    fwfContent.value = '';
+    wfModalDelete.style.display = cat ? '' : 'none';
+    wfModal.classList.add('active');
+    fwfTitle.focus();
+  }
+
+  function openWfArticleEditor(catId, art) {
+    editingCatId = catId;
+    editingArtId = art ? art.id : null;
+    wfModalTitle.textContent = art ? '编辑文章' : '添加文章';
+    wfLabel1.textContent = '文章标题';
+    wfContentGroup.style.display = '';
+    fwfTitle.value = art ? art.title : '';
+    fwfContent.value = art ? (art.content || '') : '';
+    wfModalDelete.style.display = art ? '' : 'none';
+    wfModal.classList.add('active');
+    fwfTitle.focus();
+  }
+
+  function closeWfModal() {
+    wfModal.classList.remove('active');
+    editingCatId = null;
+    editingArtId = null;
+  }
+
+  function saveWf() {
+    var title = fwfTitle.value.trim();
+    if (!title) { alert('请填写名称'); return; }
+
+    if (editingArtId) {
+      // Edit article
+      var cat = workflows.find(function(w) { return w.id === editingCatId; });
+      if (!cat) return;
+      if (!cat.articles) cat.articles = [];
+      var artIdx = cat.articles.findIndex(function(a) { return a.id === editingArtId; });
+      var artData = {
+        id: editingArtId,
+        title: title,
+        content: fwfContent.value.trim(),
+        updatedAt: new Date().toISOString()
+      };
+      if (artIdx !== -1) {
+        cat.articles[artIdx] = artData;
+      } else {
+        cat.articles.push(artData);
+      }
+      cat.updatedAt = new Date().toISOString();
+      engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+      // Also update content view if open
+      if (document.getElementById('view-wf-content').classList.contains('active')) {
+        showWfContent(editingCatId, editingArtId);
+      }
+    } else if (editingCatId) {
+      // Edit category title
+      var cat = workflows.find(function(w) { return w.id === editingCatId; });
+      if (!cat) return;
+      cat.title = title;
+      cat.updatedAt = new Date().toISOString();
+      engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+    } else {
+      // New category
+      workflows.push({
+        id: genId(),
+        title: title,
+        articles: [],
+        updatedAt: new Date().toISOString()
+      });
+      engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+    }
+    closeWfModal();
+    renderWorkflows(wfSearchInput.value);
+  }
+
+  function deleteWf() {
+    if (editingArtId) {
+      // Delete article
+      if (!confirm('确定删除此文章吗？')) return;
+      var cat = workflows.find(function(w) { return w.id === editingCatId; });
+      if (!cat) return;
+      cat.articles = (cat.articles || []).filter(function(a) { return a.id !== editingArtId; });
+      cat.updatedAt = new Date().toISOString();
+      engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+      closeWfModal();
+      if (document.getElementById('view-wf-content').classList.contains('active')) {
+        showView('workflows');
+      }
+      renderWorkflows(wfSearchInput.value);
+    } else if (editingCatId) {
+      // Delete category
+      if (!confirm('确定删除此分类及其所有文章吗？')) return;
+      workflows = workflows.filter(function(w) { return w.id !== editingCatId; });
+      engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+      closeWfModal();
+      renderWorkflows(wfSearchInput.value);
+    }
+  }
+
+  function deleteWfArticle(catId, artId) {
+    if (!confirm('确定删除此文章吗？')) return;
+    var cat = workflows.find(function(w) { return w.id === catId; });
+    if (!cat) return;
+    cat.articles = (cat.articles || []).filter(function(a) { return a.id !== artId; });
+    cat.updatedAt = new Date().toISOString();
+    engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+    showView('workflows');
+    renderWorkflows(wfSearchInput.value);
+  }
+
+  // --- Event listeners ---
+  document.getElementById('wfAddBtn').addEventListener('click', function() {
+    wfRequirePw(function() { openWfCatEditor(null); });
+  });
+  document.getElementById('wfModalCancel').addEventListener('click', closeWfModal);
+  document.getElementById('wfModalSave').addEventListener('click', saveWf);
+  document.getElementById('wfModalDelete').addEventListener('click', function() {
+    wfRequirePw(function() { deleteWf(); });
+  });
+  wfModal.addEventListener('click', function(e) {
+    if (e.target === wfModal) closeWfModal();
+  });
+  wfSearchInput.addEventListener('input', function() {
+    renderWorkflows(this.value);
+  });
+
+  // Card click delegation
+  workflowListEl.addEventListener('click', function(e) {
+    var actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+
+    var action = actionEl.getAttribute('data-action');
+    var catId = actionEl.getAttribute('data-cat');
+    var artId = actionEl.getAttribute('data-art');
+
+    if (action === 'toggleWf') {
+      expandedWf[catId] = !expandedWf[catId];
+      renderWorkflows(wfSearchInput.value);
+    } else if (action === 'viewArt') {
+      showWfContent(catId, artId);
+    } else if (action === 'editCat') {
+      wfRequirePw(function() {
+        var cat = workflows.find(function(w) { return w.id === catId; });
+        if (cat) openWfCatEditor(cat);
+      });
+    } else if (action === 'delCat') {
+      wfRequirePw(function() {
+        if (!confirm('确定删除此分类及其所有文章吗？')) return;
+        workflows = workflows.filter(function(w) { return w.id !== catId; });
+        engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+        renderWorkflows(wfSearchInput.value);
+      });
+    } else if (action === 'addArt') {
+      wfRequirePw(function() { openWfArticleEditor(catId, null); });
+    }
+  });
+
+  // Refresh button
+  document.getElementById('btnRefreshWorkflows').addEventListener('click', function() {
+    var btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '同步中...';
+    markEditing(true);
+    engine.syncFromCloud(function(ok) {
+      renderWorkflows(wfSearchInput.value);
+      markEditing(false);
+      btn.textContent = '已刷新';
+      setTimeout(function() { btn.textContent = '刷新'; btn.disabled = false; }, 800);
+    });
+  });
+
+  // ESC handler updates
+  var origKeyHandler = document.addEventListener;
+  // ESC key for wf modals is handled in the existing keydown handler
 
   // ====== Auth ======
   var loggedIn = false;
