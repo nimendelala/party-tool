@@ -536,6 +536,7 @@
     <div class="batch-bar" id="batchBar">
       <span class="selected-count" id="selectedCount">已选 0 人</span>
       <button class="btn-select-all" id="btnSelectAll">全选</button>
+      <button class="btn-select-all" id="btnSelectReverse" style="border-color:#c0392b;color:#c0392b;">反选</button>
       <button class="btn-edit-batch" id="btnEditBatch">批量修改</button>
       <button class="btn-delete-batch" id="btnDeleteBatch">删除</button>
       <button class="btn-cancel-batch" id="btnCancelBatch">取消</button>
@@ -1243,6 +1244,7 @@
   var batchBar = document.getElementById('batchBar');
   var selectedCountEl = document.getElementById('selectedCount');
   var btnSelectAll = document.getElementById('btnSelectAll');
+  var btnSelectReverse = document.getElementById('btnSelectReverse');
   var btnDeleteBatch = document.getElementById('btnDeleteBatch');
   var btnCancelBatch = document.getElementById('btnCancelBatch');
 
@@ -1283,6 +1285,17 @@
     } else {
       ids.forEach(function(id) { selectedIds[id] = true; });
     }
+    render(searchInput.value);
+  });
+
+  btnSelectReverse.addEventListener('click', function() {
+    filteredPeople.forEach(function(p) {
+      if (selectedIds[p.id]) {
+        delete selectedIds[p.id];
+      } else {
+        selectedIds[p.id] = true;
+      }
+    });
     render(searchInput.value);
   });
 
