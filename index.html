@@ -472,6 +472,27 @@
   .home-btn:active { background: #f0f0f0; }
   .home-btn.btn-logout { color: #e74c3c; border-color: #e8c8c8; }
 
+  /* Sync status */
+  .sync-status {
+    display: none;
+    text-align: center;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .sync-status.error {
+    display: block;
+    background: #fdecea;
+    color: #c0392b;
+  }
+  .sync-status.ok {
+    display: block;
+    background: #e8f8ee;
+    color: #27ae60;
+  }
+
 </style>
 </head>
 <body>
@@ -485,6 +506,8 @@
 
 
 <div class="container">
+
+  <div id="syncStatus" class="sync-status"></div>
 
   <!-- ====== Login View ====== -->
   <div id="view-login" class="view active">
@@ -751,13 +774,37 @@
     // Save then double-sync to beat KV eventual consistency lag
     function saveAndSync(callback) {
       save().then(function() {
+        clearSyncStatus();
         engine.syncFromCloud(callback);
         setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
       }).catch(function() {
+        showSyncStatus('保存失败，请检查网络后刷新重试', 'error');
         engine.syncFromCloud(callback);
         setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
       });
     }
+
+    // Sync status helpers
+    var statusTimer = null;
+    function showSyncStatus(msg, type) {
+      var el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (statusTimer) clearTimeout(statusTimer);
+      el.textContent = msg;
+      el.className = 'sync-status ' + (type || 'error');
+      statusTimer = setTimeout(function() {
+        el.className = 'sync-status';
+        el.textContent = '';
+      }, 5000);
+    }
+    function clearSyncStatus() {
+      var el = document.getElementById('syncStatus');
+      if (!el) return;
+      if (statusTimer) clearTimeout(statusTimer);
+      el.className = 'sync-status';
+      el.textContent = '';
+    }
+
     // Load from API, fallback to localStorage
     function loadData(callback) {
       fetch(API_BASE + '?_=' + Date.now())
@@ -1520,15 +1567,6 @@
   var tasks = [];
   var taskEditingId = null;
 
-  var taskEngine = (function() {
-    function loadData(callback) {
-      // Tasks are loaded together with students via engine.loadData
-      // This just provides the save API, actual loading is in engine.loadData
-      callback();
-    }
-    return { save: engine.save, loadData: loadData, syncFromCloud: engine.syncFromCloud, saveAndSync: engine.saveAndSync };
-  })();
-
   // Task render
   var taskListEl = document.getElementById('taskList');
   var taskCountEl = document.getElementById('taskCount');
@@ -1623,7 +1661,7 @@
       tasks.push(data);
     }
 
-    taskEngine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
+    engine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
     closeTaskModal();
     renderTasks(taskSearchInput.value);
   }
@@ -1632,7 +1670,7 @@
     if (!taskEditingId) return;
     if (!confirm('确定删除该任务吗？')) return;
     tasks = tasks.filter(function(t) { return t.id !== taskEditingId; });
-    taskEngine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
+    engine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
     closeTaskModal();
     renderTasks(taskSearchInput.value);
   }
@@ -1683,7 +1721,7 @@
       if (action === 'delete') {
         if (!confirm('确定删除该任务吗？')) return;
         tasks = tasks.filter(function(t) { return t.id !== id; });
-        taskEngine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
+        engine.saveAndSync(function() { renderTasks(taskSearchInput.value); });
         renderTasks(taskSearchInput.value);
         return;
       }
