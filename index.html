@@ -950,58 +950,37 @@
     // Fetch latest + merge + PUT, with version-check retry
     function save() {
       backupLocal();
-      return fetch(API_BASE + '?_=' + Date.now(), { cache: 'no-store' })
-        .then(function(r) { return r.json(); })
-        .then(function(cloudData) {
-          // Merge local changes with latest cloud data
-          var cloudStudents = cloudData.students || [];
-          var cloudTasks = cloudData.tasks || [];
-          var cloudWorkflows = cloudData.workflows || [];
-          var cloudVersion = cloudData.version || currentVersion;
 
-          markCloudSeen(cloudStudents);
-          markCloudSeen(cloudTasks);
-
-          people = mergeByUpdatedAt(people, cloudStudents);
-          tasks = mergeByUpdatedAt(tasks, cloudTasks);
-          workflows = mergeWorkflows(workflows, cloudWorkflows);
-          currentVersion = cloudVersion;
-
-          function doPut(version) {
-            return fetch(API_BASE, {
-              cache: 'no-store',
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ students: people, tasks: tasks, workflows: workflows, _version: version })
-            }).then(function(r) {
-              if (r.status === 409) {
-                // Another client saved between our GET and PUT — re-merge and retry once
-                return r.json().then(function(conflict) {
-                  markCloudSeen(conflict.students || []);
-                  markCloudSeen(conflict.tasks || []);
-                  people = mergeByUpdatedAt(people, conflict.students || []);
-                  tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
-                  workflows = mergeWorkflows(workflows, conflict.workflows || []);
-                  currentVersion = conflict.version;
-                  return fetch(API_BASE, {
-                    cache: 'no-store',
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ students: people, tasks: tasks, workflows: workflows, _version: conflict.version })
-                  }).then(function(r) {
-                    return r.json().then(function(d) {
-                      if (d.version) currentVersion = d.version;
-                    });
-                  });
-                });
-              }
-              return r.json().then(function(d) {
-                if (d.version) currentVersion = d.version;
+      function doPut(version, retry) {
+        retry = retry || 0;
+        return fetch(API_BASE, {
+          cache: 'no-store',
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students: people, tasks: tasks, workflows: workflows, _version: version })
+        }).then(function(r) {
+          if (r.status === 409 && retry < 3) {
+            // Conflict: another client saved since our last sync — merge and retry
+            return r.json().then(function(conflict) {
+              markCloudSeen(conflict.students || []);
+              markCloudSeen(conflict.tasks || []);
+              people = mergeByUpdatedAt(people, conflict.students || []);
+              tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
+              workflows = mergeWorkflows(workflows, conflict.workflows || []);
+              currentVersion = conflict.version;
+              return new Promise(function(resolve) {
+                setTimeout(function() {
+                  resolve(doPut(conflict.version, retry + 1));
+                }, 100 * (retry + 1));
               });
             });
           }
-          return doPut(cloudVersion);
+          return r.json().then(function(d) {
+            if (d.version) currentVersion = d.version;
+          });
         });
+      }
+      return doPut(currentVersion);
     }
 
     // Save then double-sync to beat KV eventual consistency lag
