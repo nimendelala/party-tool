@@ -7,26 +7,42 @@ export async function onRequest(context) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "no-store, no-cache, must-revalidate"
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "CDN-Cache-Control": "no-cache",
+    "Surrogate-Control": "no-store",
+    "Pragma": "no-cache",
+    "Expires": "0"
   };
 
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: apiHeaders });
   }
 
+  // Helper: read data, migrating from legacy separate keys if needed
+  async function readData() {
+    let data = await env.PARTY_DATA.get("data", { type: "json" });
+    if (data && typeof data.version === "number") return data;
+
+    // Migration: read from legacy separate keys, combine into one
+    const rawStudents = await env.PARTY_DATA.get("students");
+    const students = rawStudents ? JSON.parse(rawStudents) : [];
+    const rawTasks = await env.PARTY_DATA.get("tasks");
+    const tasks = rawTasks ? JSON.parse(rawTasks) : [];
+    const version = parseInt(await env.PARTY_DATA.get("_version") || "1");
+    data = { students, tasks, version };
+    await env.PARTY_DATA.put("data", JSON.stringify(data));
+    return data;
+  }
+
   // GET /api/data - read shared data
   if (path === "/api/data" && request.method === "GET") {
     try {
-      const raw = await env.PARTY_DATA.get("students");
-      const students = raw ? JSON.parse(raw) : [];
-      const tasksRaw = await env.PARTY_DATA.get("tasks");
-      const tasks = tasksRaw ? JSON.parse(tasksRaw) : [];
-      const version = parseInt(await env.PARTY_DATA.get("_version") || "1");
-      return new Response(JSON.stringify({ students: students, tasks: tasks, version: version }), {
+      const data = await readData();
+      return new Response(JSON.stringify(data), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     } catch (e) {
-      return new Response(JSON.stringify({ students: [], tasks: [] }), {
+      return new Response(JSON.stringify({ students: [], tasks: [], version: 1 }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
     }
@@ -37,19 +53,15 @@ export async function onRequest(context) {
     try {
       const body = await request.json();
       const reqVersion = body._version || 0;
-      const rawVersion = await env.PARTY_DATA.get("_version");
-      const storedVersion = parseInt(rawVersion || "1");
+      const current = await readData();
+      const storedVersion = current.version || 1;
 
       // Version conflict: client save was based on stale data
       if (reqVersion > 0 && reqVersion < storedVersion) {
-        const conflictStudentsRaw = await env.PARTY_DATA.get("students");
-        const conflictStudents = conflictStudentsRaw ? JSON.parse(conflictStudentsRaw) : [];
-        const conflictTasksRaw = await env.PARTY_DATA.get("tasks");
-        const conflictTasks = conflictTasksRaw ? JSON.parse(conflictTasksRaw) : [];
         return new Response(JSON.stringify({
           conflict: true,
-          students: conflictStudents,
-          tasks: conflictTasks,
+          students: current.students,
+          tasks: current.tasks,
           version: storedVersion
         }), {
           status: 409,
@@ -57,14 +69,13 @@ export async function onRequest(context) {
         });
       }
 
-      if (Array.isArray(body.students)) {
-        await env.PARTY_DATA.put("students", JSON.stringify(body.students));
-      }
-      if (Array.isArray(body.tasks)) {
-        await env.PARTY_DATA.put("tasks", JSON.stringify(body.tasks));
-      }
       const newVersion = Math.max(reqVersion, storedVersion) + 1;
-      await env.PARTY_DATA.put("_version", String(newVersion));
+      const newData = {
+        students: Array.isArray(body.students) ? body.students : current.students,
+        tasks: Array.isArray(body.tasks) ? body.tasks : current.tasks,
+        version: newVersion
+      };
+      await env.PARTY_DATA.put("data", JSON.stringify(newData));
       return new Response(JSON.stringify({ ok: true, version: newVersion }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });

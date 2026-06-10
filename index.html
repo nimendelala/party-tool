@@ -727,7 +727,7 @@
   var engine = (function() {
     // Fetch latest + merge + PUT, with version-check retry
     function save() {
-      return fetch(API_BASE + '?_=' + Date.now())
+      return fetch(API_BASE + '?_=' + Date.now(), { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(cloudData) {
           // Merge local changes with latest cloud data
@@ -741,6 +741,7 @@
 
           function doPut(version) {
             return fetch(API_BASE, {
+              cache: 'no-store',
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ students: people, tasks: tasks, _version: version })
@@ -752,6 +753,7 @@
                   tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
                   currentVersion = conflict.version;
                   return fetch(API_BASE, {
+                    cache: 'no-store',
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ students: people, tasks: tasks, _version: conflict.version })
@@ -807,7 +809,7 @@
 
     // Load from API, fallback to localStorage
     function loadData(callback) {
-      fetch(API_BASE + '?_=' + Date.now())
+      fetch(API_BASE + '?_=' + Date.now(), { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
           currentVersion = data.version || 0;
@@ -851,7 +853,7 @@
 
     // Pull latest data from cloud without saving local changes first
     function syncFromCloud(callback) {
-      fetch(API_BASE + '?_=' + Date.now())
+      fetch(API_BASE + '?_=' + Date.now(), { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
           currentVersion = data.version || currentVersion;
@@ -1847,6 +1849,7 @@
     btn.textContent = '验证中...';
     btn.disabled = true;
     fetch('/api/auth', {
+      cache: 'no-store',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: pw })
@@ -1901,6 +1904,7 @@
     var newPw = document.getElementById('fNewPw').value.trim();
     if (!adminPw || !newPw) { alert('请填写完整'); return; }
     fetch('/api/auth/change', {
+      cache: 'no-store',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adminPassword: adminPw, newPassword: newPw })
