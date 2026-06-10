@@ -146,7 +146,7 @@
     color: #888;
     margin-bottom: 4px;
   }
-  .form-group input, .form-group textarea {
+  .form-group input, .form-group textarea, .form-group select {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #ddd;
@@ -524,7 +524,7 @@
   <div id="view-students" class="view">
     <button class="back-btn" id="backFromStudents">← 返回首页</button>
     <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="搜索姓名、班级、当前状态、电话、备注...">
+      <input type="text" id="searchInput" placeholder="搜索...">
     </div>
     <button class="add-btn" id="addBtn">+ 添加学生</button>
     <div class="toolbar">
@@ -550,7 +550,7 @@
   <div id="view-tasks" class="view">
     <button class="back-btn" id="backFromTasks">← 返回首页</button>
     <div class="search-bar">
-      <input type="text" id="taskSearchInput" placeholder="搜索任务标题、备注...">
+      <input type="text" id="taskSearchInput" placeholder="搜索...">
     </div>
     <button class="add-btn" id="taskAddBtn">+ 添加任务</button>
     <div class="toolbar">
@@ -758,13 +758,6 @@
         setTimeout(function() { engine.syncFromCloud(callback); }, 1500);
       });
     }
-    var saveTimer = null;
-    function debouncedSave() {
-      if (saveTimer) clearTimeout(saveTimer);
-      save();
-      saveTimer = setTimeout(function() { save(); }, 500);
-    }
-
     // Load from API, fallback to localStorage
     function loadData(callback) {
       fetch(API_BASE + '?_=' + Date.now())
@@ -828,7 +821,7 @@
         });
     }
 
-    return { save: save, debouncedSave: debouncedSave, loadData: loadData, syncFromCloud: syncFromCloud, saveAndSync: saveAndSync };
+    return { save: save, loadData: loadData, syncFromCloud: syncFromCloud, saveAndSync: saveAndSync };
   })();
 
   // Last rendered snapshots for diff detection
@@ -1533,7 +1526,7 @@
       // This just provides the save API, actual loading is in engine.loadData
       callback();
     }
-    return { save: engine.save, debouncedSave: engine.debouncedSave, loadData: loadData, syncFromCloud: engine.syncFromCloud, saveAndSync: engine.saveAndSync };
+    return { save: engine.save, loadData: loadData, syncFromCloud: engine.syncFromCloud, saveAndSync: engine.saveAndSync };
   })();
 
   // Task render
