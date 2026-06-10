@@ -7,34 +7,64 @@ export async function onRequest(context) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    "CDN-Cache-Control": "no-cache",
-    "Surrogate-Control": "no-store",
-    "Pragma": "no-cache",
-    "Expires": "0"
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
   };
 
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: apiHeaders });
   }
 
-  // Helper: read data, migrating from legacy separate keys if needed
-  async function readData() {
-    let data = await env.PARTY_DATA.get("data", { type: "json" });
-    if (data && typeof data.version === "number") return data;
+  // --- D1 helpers ---
 
-    // Migration: read from legacy separate keys, combine into one
-    const rawStudents = await env.PARTY_DATA.get("students");
-    const students = rawStudents ? JSON.parse(rawStudents) : [];
-    const rawTasks = await env.PARTY_DATA.get("tasks");
-    const tasks = rawTasks ? JSON.parse(rawTasks) : [];
-    const version = parseInt(await env.PARTY_DATA.get("_version") || "1");
-    data = { students, tasks, version };
-    await env.PARTY_DATA.put("data", JSON.stringify(data));
-    return data;
+  async function readData() {
+    const row = await env.DB.prepare(
+      'SELECT students, tasks, version FROM app_data WHERE id = 1'
+    ).first();
+
+    if (row) {
+      return {
+        students: JSON.parse(row.students || '[]'),
+        tasks: JSON.parse(row.tasks || '[]'),
+        version: row.version || 1
+      };
+    }
+
+    // Empty D1 — try migrating from KV (one-time)
+    try {
+      const rawStudents = await env.PARTY_DATA.get("students");
+      const rawTasks = await env.PARTY_DATA.get("tasks");
+      const rawVersion = await env.PARTY_DATA.get("_version");
+      const data = await env.PARTY_DATA.get("data", { type: "json" });
+
+      let students = [], tasks = [], version = 1;
+
+      if (data && typeof data.version === "number") {
+        students = data.students || [];
+        tasks = data.tasks || [];
+        version = data.version || 1;
+      } else if (rawStudents) {
+        students = JSON.parse(rawStudents);
+        tasks = rawTasks ? JSON.parse(rawTasks) : [];
+        version = parseInt(rawVersion || "1");
+      }
+
+      if (students.length > 0 || tasks.length > 0) {
+        await env.DB.prepare(
+          'INSERT OR REPLACE INTO app_data (id, students, tasks, version) VALUES (1, ?, ?, ?)'
+        ).bind(JSON.stringify(students), JSON.stringify(tasks), version).run();
+      } else {
+        await env.DB.prepare(
+          'INSERT OR IGNORE INTO app_data (id, students, tasks, version) VALUES (1, ?, ?, ?)'
+        ).bind('[]', '[]', 1).run();
+      }
+
+      return { students, tasks, version };
+    } catch (e) {
+      return { students: [], tasks: [], version: 1 };
+    }
   }
 
-  // GET /api/data - read shared data
+  // --- GET /api/data ---
   if (path === "/api/data" && request.method === "GET") {
     try {
       const data = await readData();
@@ -48,7 +78,7 @@ export async function onRequest(context) {
     }
   }
 
-  // PUT /api/data - save shared data
+  // --- PUT /api/data ---
   if (path === "/api/data" && request.method === "PUT") {
     try {
       const body = await request.json();
@@ -56,7 +86,7 @@ export async function onRequest(context) {
       const current = await readData();
       const storedVersion = current.version || 1;
 
-      // Version conflict: client save was based on stale data
+      // Version conflict
       if (reqVersion > 0 && reqVersion < storedVersion) {
         return new Response(JSON.stringify({
           conflict: true,
@@ -70,12 +100,40 @@ export async function onRequest(context) {
       }
 
       const newVersion = Math.max(reqVersion, storedVersion) + 1;
-      const newData = {
-        students: Array.isArray(body.students) ? body.students : current.students,
-        tasks: Array.isArray(body.tasks) ? body.tasks : current.tasks,
-        version: newVersion
-      };
-      await env.PARTY_DATA.put("data", JSON.stringify(newData));
+      const students = JSON.stringify(
+        Array.isArray(body.students) ? body.students : current.students
+      );
+      const tasks = JSON.stringify(
+        Array.isArray(body.tasks) ? body.tasks : current.tasks
+      );
+
+      // Optimistic locking: only update if version hasn't changed
+      const result = await env.DB.prepare(
+        'UPDATE app_data SET students = ?, tasks = ?, version = ? WHERE id = 1 AND version = ?'
+      ).bind(students, tasks, newVersion, storedVersion).run();
+
+      if (result.changes === 0) {
+        // Race: another request updated between our read and write
+        const fresh = await env.DB.prepare(
+          'SELECT students, tasks, version FROM app_data WHERE id = 1'
+        ).first();
+        const freshData = fresh ? {
+          students: JSON.parse(fresh.students || '[]'),
+          tasks: JSON.parse(fresh.tasks || '[]'),
+          version: fresh.version || 1
+        } : { students: [], tasks: [], version: 1 };
+
+        return new Response(JSON.stringify({
+          conflict: true,
+          students: freshData.students,
+          tasks: freshData.tasks,
+          version: freshData.version
+        }), {
+          status: 409,
+          headers: { ...apiHeaders, "Content-Type": "application/json" }
+        });
+      }
+
       return new Response(JSON.stringify({ ok: true, version: newVersion }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
@@ -87,7 +145,7 @@ export async function onRequest(context) {
     }
   }
 
-  // POST /api/auth - verify password
+  // --- POST /api/auth ---
   if (path === "/api/auth" && request.method === "POST") {
     try {
       const body = await request.json();
@@ -103,7 +161,7 @@ export async function onRequest(context) {
     }
   }
 
-  // POST /api/auth/change - change login password (requires admin password)
+  // --- POST /api/auth/change ---
   if (path === "/api/auth/change" && request.method === "POST") {
     try {
       const body = await request.json();
@@ -126,6 +184,5 @@ export async function onRequest(context) {
     }
   }
 
-  // Fallback for other paths under /api
   return new Response("Not Found", { status: 404 });
 }

@@ -14,5 +14,12 @@
       "binding": "PARTY_DATA",
       "id": "a31a17d5f45e4a9eb2e779ca157094d5"
     }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "party_data",
+      "database_id": "a3b60240-8acb-4902-be49-0d6743ade9e5"
+    }
   ]
 }
