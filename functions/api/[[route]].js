@@ -168,7 +168,7 @@ export async function onRequest(context) {
     try {
       const body = await request.json();
       const stored = await env.PARTY_DATA.get("_password");
-      const valid = body.password === (stored || "123");
+      const valid = body.password === (stored || "319");
       return new Response(JSON.stringify({ ok: valid }), {
         headers: { ...apiHeaders, "Content-Type": "application/json" }
       });
@@ -184,7 +184,7 @@ export async function onRequest(context) {
     try {
       const body = await request.json();
       const adminStored = await env.PARTY_DATA.get("_admin_pw");
-      const adminPw = adminStored || "123";
+      const adminPw = adminStored || "319";
       if (body.adminPassword !== adminPw) {
         return new Response(JSON.stringify({ ok: false, error: "管理密码错误" }), {
           headers: { ...apiHeaders, "Content-Type": "application/json" }

@@ -2284,7 +2284,7 @@
   document.getElementById('wfPwConfirm').addEventListener('click', function() {
     var pw = document.getElementById('wfPwInput').value.trim();
     if (!pw) return;
-    if (pw === '1234') {
+    if (pw === '123') {
       document.getElementById('wfPwModal').classList.remove('active');
       var action = wfPendingAction;
       wfPendingAction = null;
