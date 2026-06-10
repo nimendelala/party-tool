@@ -2513,21 +2513,6 @@
   // ESC key for wf modals is handled in the existing keydown handler
 
   // ====== Auth ======
-  var loggedIn = false;
-
-  function checkSession() {
-    return localStorage.getItem('party_session') === '1';
-  }
-
-  function setSession() {
-    localStorage.setItem('party_session', '1');
-    loggedIn = true;
-  }
-
-  function clearSession() {
-    localStorage.removeItem('party_session');
-    loggedIn = false;
-  }
 
   // Login
   document.getElementById('loginBtn').addEventListener('click', function() {
@@ -2544,7 +2529,6 @@
     }).then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.ok) {
-          setSession();
           document.getElementById('loginError').style.display = 'none';
           document.getElementById('loginPassword').value = '';
           engine.loadData(function() {
@@ -2572,7 +2556,9 @@
 
   // Logout
   document.getElementById('btnLogout').addEventListener('click', function() {
-    clearSession();
+    people = [];
+    tasks = [];
+    workflows = [];
     showView('login');
   });
 
@@ -2612,13 +2598,7 @@
   });
 
   // ====== Init ======
-  if (checkSession()) {
-    setSession();
-    showView('home');
-    engine.loadData(function() {});
-  } else {
-    showView('login');
-  }
+  showView('login');
 })();
 </script>
 <script>// Unregister old PWA service worker
