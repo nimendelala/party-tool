@@ -921,6 +921,21 @@
     return result;
   }
 
+  // Workflow merge: category-level merge + article-level merge within each category
+  function mergeWorkflows(localWfs, remoteWfs) {
+    var merged = mergeByUpdatedAt(localWfs, remoteWfs);
+    merged.forEach(function(w) {
+      var remoteCat = remoteWfs.find(function(rw) { return rw.id === w.id; });
+      if (remoteCat) {
+        w.articles = mergeByUpdatedAt(w.articles || [], remoteCat.articles || []);
+        var localTs = new Date(w.updatedAt || 0).getTime();
+        var remoteTs = new Date(remoteCat.updatedAt || 0).getTime();
+        w.updatedAt = new Date(Math.max(localTs, remoteTs)).toISOString();
+      }
+    });
+    return merged;
+  }
+
   // Cloud API storage engine
   var engine = (function() {
     // Backup current state to localStorage (prevents loss on refresh before save completes)
@@ -949,7 +964,7 @@
 
           people = mergeByUpdatedAt(people, cloudStudents);
           tasks = mergeByUpdatedAt(tasks, cloudTasks);
-          workflows = mergeByUpdatedAt(workflows, cloudWorkflows);
+          workflows = mergeWorkflows(workflows, cloudWorkflows);
           currentVersion = cloudVersion;
 
           function doPut(version) {
@@ -966,7 +981,7 @@
                   markCloudSeen(conflict.tasks || []);
                   people = mergeByUpdatedAt(people, conflict.students || []);
                   tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
-                  workflows = mergeByUpdatedAt(workflows, conflict.workflows || []);
+                  workflows = mergeWorkflows(workflows, conflict.workflows || []);
                   currentVersion = conflict.version;
                   return fetch(API_BASE, {
                     cache: 'no-store',
@@ -1138,7 +1153,7 @@
             tasks = mergeByUpdatedAt(tasks, data.tasks);
           }
           if (Array.isArray(data.workflows)) {
-            workflows = mergeByUpdatedAt(workflows, data.workflows);
+            workflows = mergeWorkflows(workflows, data.workflows);
           }
           if (callback) callback(true);
         })
@@ -2244,6 +2259,9 @@
   document.getElementById('wfPwModal').addEventListener('click', function(e) {
     if (e.target === this) { this.classList.remove('active'); wfPendingAction = null; }
   });
+  document.getElementById('wfPwInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('wfPwConfirm').click();
+  });
   document.getElementById('wfPwConfirm').addEventListener('click', function() {
     var pw = document.getElementById('wfPwInput').value.trim();
     if (!pw) return;
@@ -2298,6 +2316,7 @@
     fwfTitle.value = cat ? cat.title : '';
     fwfContent.value = '';
     wfModalDelete.style.display = cat ? '' : 'none';
+    markEditing(true);
     wfModal.classList.add('active');
     fwfTitle.focus();
   }
@@ -2312,11 +2331,13 @@
     fwfTitle.value = art ? art.title : '';
     fwfContent.value = art ? (art.content || '') : '';
     wfModalDelete.style.display = art ? '' : 'none';
+    markEditing(true);
     wfModal.classList.add('active');
     fwfTitle.focus();
   }
 
   function closeWfModal() {
+    markEditing(false);
     wfModal.classList.remove('active');
     editingCatId = null;
     editingArtId = null;
