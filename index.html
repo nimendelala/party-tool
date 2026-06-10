@@ -2390,6 +2390,7 @@
       if (!confirm('确定删除此文章吗？')) return;
       var cat = workflows.find(function(w) { return w.id === editingCatId; });
       if (!cat) return;
+      markDeleted(editingArtId);
       cat.articles = (cat.articles || []).filter(function(a) { return a.id !== editingArtId; });
       cat.updatedAt = new Date().toISOString();
       engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
@@ -2401,6 +2402,7 @@
     } else if (editingCatId) {
       // Delete category
       if (!confirm('确定删除此分类及其所有文章吗？')) return;
+      markDeleted(editingCatId);
       workflows = workflows.filter(function(w) { return w.id !== editingCatId; });
       engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
       closeWfModal();
@@ -2410,6 +2412,7 @@
 
   function deleteWfArticle(catId, artId) {
     if (!confirm('确定删除此文章吗？')) return;
+    markDeleted(artId);
     var cat = workflows.find(function(w) { return w.id === catId; });
     if (!cat) return;
     cat.articles = (cat.articles || []).filter(function(a) { return a.id !== artId; });
@@ -2457,6 +2460,7 @@
     } else if (action === 'delCat') {
       wfRequirePw(function() {
         if (!confirm('确定删除此分类及其所有文章吗？')) return;
+        markDeleted(catId);
         workflows = workflows.filter(function(w) { return w.id !== catId; });
         engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
         renderWorkflows(wfSearchInput.value);
