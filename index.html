@@ -2188,7 +2188,7 @@
     }
 
     displayList.sort(function(a, b) {
-      return (a.category.title || '').trim().localeCompare((b.category.title || '').trim(), 'zh');
+      return (a.category.createdAt || '0').localeCompare(b.category.createdAt || '0');
     });
 
     workflowCountEl.textContent = q
@@ -2416,6 +2416,7 @@
         id: genId(),
         title: title,
         articles: [],
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
       engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
