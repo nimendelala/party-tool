@@ -711,6 +711,14 @@
     recentlyDeleted[id] = Date.now();
   }
 
+  // Track IDs ever seen from cloud — used to detect remote deletions
+  var cloudSeenIds = {};
+  function markCloudSeen(items) {
+    items.forEach(function(item) {
+      if (item && item.id) cloudSeenIds[item.id] = true;
+    });
+  }
+
   // Merge helper: for each record ID, keep the newer version (by updatedAt)
   function mergeByUpdatedAt(localItems, remoteItems) {
     var merged = {};
@@ -722,6 +730,9 @@
     });
     localItems.forEach(function(item) {
       if (!merged[item.id]) {
+        // If this item was seen in the cloud before but isn't in current cloud data,
+        // it was deleted remotely — don't resurrect it
+        if (cloudSeenIds[item.id]) return;
         merged[item.id] = item;
       } else {
         var localTime = new Date(item.updatedAt || 0).getTime();
@@ -746,6 +757,9 @@
           var cloudTasks = cloudData.tasks || [];
           var cloudVersion = cloudData.version || currentVersion;
 
+          markCloudSeen(cloudStudents);
+          markCloudSeen(cloudTasks);
+
           people = mergeByUpdatedAt(people, cloudStudents);
           tasks = mergeByUpdatedAt(tasks, cloudTasks);
           currentVersion = cloudVersion;
@@ -760,6 +774,8 @@
               if (r.status === 409) {
                 // Another client saved between our GET and PUT — re-merge and retry once
                 return r.json().then(function(conflict) {
+                  markCloudSeen(conflict.students || []);
+                  markCloudSeen(conflict.tasks || []);
                   people = mergeByUpdatedAt(people, conflict.students || []);
                   tasks = mergeByUpdatedAt(tasks, conflict.tasks || []);
                   currentVersion = conflict.version;
@@ -824,6 +840,8 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           currentVersion = data.version || 0;
+          markCloudSeen(data.students || []);
+          markCloudSeen(data.tasks || []);
           var arr = data.students || data;
           if (Array.isArray(arr) && arr.length > 0) {
             people = arr;
@@ -868,6 +886,8 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           currentVersion = data.version || currentVersion;
+          markCloudSeen(data.students || []);
+          markCloudSeen(data.tasks || []);
           if (Array.isArray(data.students)) {
             people = mergeByUpdatedAt(people, data.students);
           }
