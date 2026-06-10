@@ -2284,33 +2284,15 @@
   document.getElementById('wfPwConfirm').addEventListener('click', function() {
     var pw = document.getElementById('wfPwInput').value.trim();
     if (!pw) return;
-    var btn = this;
-    btn.textContent = '验证中...';
-    btn.disabled = true;
-    fetch('/api/auth', {
-      cache: 'no-store',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw })
-    }).then(function(r) { return r.json(); })
-      .then(function(data) {
-        btn.textContent = '确认';
-        btn.disabled = false;
-        if (data.ok) {
-          document.getElementById('wfPwModal').classList.remove('active');
-          var action = wfPendingAction;
-          wfPendingAction = null;
-          if (action) action();
-        } else {
-          document.getElementById('wfPwError').style.display = '';
-          document.getElementById('wfPwInput').value = '';
-        }
-      })
-      .catch(function() {
-        btn.textContent = '确认';
-        btn.disabled = false;
-        document.getElementById('wfPwError').style.display = '';
-      });
+    if (pw === '1234') {
+      document.getElementById('wfPwModal').classList.remove('active');
+      var action = wfPendingAction;
+      wfPendingAction = null;
+      if (action) action();
+    } else {
+      document.getElementById('wfPwError').style.display = '';
+      document.getElementById('wfPwInput').value = '';
+    }
   });
 
   // --- Category CRUD ---
