@@ -1305,11 +1305,34 @@
 
   function render(filter) {
     var raw = (filter || '').trim();
-    var keywords = raw ? raw.split(/[,\s\n\r]+/) : [];
-    var multiKeyword = keywords.length > 1;
+
+    // Field-specific search: jj:, fz:, yb:, zs:, or Chinese prefixes
+    var prefixMap = {
+      'jj:':'jjDate','积极分子:':'jjDate',
+      'fz:':'fzDate','发展对象:':'fzDate',
+      'yb:':'ybDate','预备党员:':'ybDate',
+      'zs:':'zsDate','正式党员:':'zsDate'
+    };
+    var fieldKey = null, searchTerm = '', prefixKeys = Object.keys(prefixMap);
+    for (var i = 0; i < prefixKeys.length; i++) {
+      if (raw.toLowerCase().indexOf(prefixKeys[i]) === 0) {
+        fieldKey = prefixMap[prefixKeys[i]];
+        searchTerm = raw.slice(prefixKeys[i].length).trim().toLowerCase();
+        break;
+      }
+    }
 
     var filtered;
-    if (keywords.length > 0) {
+    if (fieldKey) {
+      // Prefix mode: search only the specified date field
+      filtered = people.filter(function(p) {
+        var val = (p[fieldKey] || '');
+        if (searchTerm === '') return val !== '';
+        return val.toLowerCase().indexOf(searchTerm) !== -1;
+      });
+    } else if (raw) {
+      var keywords = raw.split(/[,\s\n\r]+/);
+      var multiKeyword = keywords.length > 1;
       var lowerKeys = keywords.map(function(k) { return k.toLowerCase(); });
       filtered = people.filter(function(p) {
         if (multiKeyword) {
