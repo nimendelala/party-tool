@@ -1315,9 +1315,10 @@
     };
     var fieldKey = null, searchTerm = '', prefixKeys = Object.keys(prefixMap);
     for (var i = 0; i < prefixKeys.length; i++) {
-      if (raw.toLowerCase().indexOf(prefixKeys[i]) === 0) {
-        fieldKey = prefixMap[prefixKeys[i]];
-        searchTerm = raw.slice(prefixKeys[i].length).trim().toLowerCase();
+      var pk = prefixKeys[i];
+      if (raw.toLowerCase().indexOf(pk) === 0 && raw.length > pk.length) {
+        fieldKey = prefixMap[pk];
+        searchTerm = raw.slice(pk.length).trim().toLowerCase();
         break;
       }
     }
