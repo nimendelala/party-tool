@@ -1234,6 +1234,10 @@
             var tr = localStorage.getItem(TASK_STORAGE_KEY);
             if (tr) { var tp = JSON.parse(tr); tasks = tp.tasks || []; }
           } catch (e) { tasks = []; }
+          try {
+            var wr = localStorage.getItem(WFLOW_STORAGE_KEY);
+            if (wr) { var wp = JSON.parse(wr); workflows = wp.workflows || []; }
+          } catch (e) { workflows = []; }
           callback();
         });
     }
@@ -1673,8 +1677,11 @@
   modal.addEventListener('click', function(e) {
     if (e.target === modal) closeModal();
   });
+  var searchTimer = null;
   searchInput.addEventListener('input', function() {
-    render(this.value);
+    var val = this.value;
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { render(val); }, 200);
   });
 
   // Status tabs
@@ -1787,9 +1794,11 @@
         added++;
       }
     });
-    engine.save();
+    engine.saveAndSync(function() {
+      render(searchInput.value);
+      alert('导入完成！新增 ' + added + ' 人，跳过 ' + (imported.length - added) + ' 个重复记录。');
+    });
     render(searchInput.value);
-    alert('导入完成！新增 ' + added + ' 人，跳过 ' + (imported.length - added) + ' 个重复记录。');
   }
 
   var importFile = document.getElementById('importFile');
@@ -2385,8 +2394,11 @@
   taskModal.addEventListener('click', function(e) {
     if (e.target === taskModal) closeTaskModal();
   });
+  var taskSearchTimer = null;
   taskSearchInput.addEventListener('input', function() {
-    renderTasks(this.value);
+    var val = this.value;
+    if (taskSearchTimer) clearTimeout(taskSearchTimer);
+    taskSearchTimer = setTimeout(function() { renderTasks(val); }, 200);
   });
   taskListEl.addEventListener('click', function(e) {
     var actionEl = e.target.closest('[data-action]');
@@ -2558,6 +2570,7 @@
         + '</div>'
         + '</div>';
     }).join('');
+    lastWorkflowsJSON = JSON.stringify(workflows);
   }
 
   // --- Content viewer ---
@@ -2788,8 +2801,11 @@
   wfModal.addEventListener('click', function(e) {
     if (e.target === wfModal) closeWfModal();
   });
+  var wfSearchTimer = null;
   wfSearchInput.addEventListener('input', function() {
-    renderWorkflows(this.value);
+    var val = this.value;
+    if (wfSearchTimer) clearTimeout(wfSearchTimer);
+    wfSearchTimer = setTimeout(function() { renderWorkflows(val); }, 200);
   });
 
   // Card click delegation
@@ -2838,10 +2854,6 @@
       setTimeout(function() { btn.textContent = '刷新'; btn.disabled = false; }, 800);
     });
   });
-
-  // ESC handler updates
-  var origKeyHandler = document.addEventListener;
-  // ESC key for wf modals is handled in the existing keydown handler
 
   // ====== Auth ======
 
@@ -2965,7 +2977,6 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script>// Lazy-load XLSX only when needed (fast initial load)
-var _xlsxLoaded = false;
 var _xlsxLoading = false;
 var _xlsxCallbacks = [];
 function loadXlsx(cb) {
@@ -2976,7 +2987,6 @@ function loadXlsx(cb) {
   var s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
   s.onload = function() {
-    _xlsxLoaded = true;
     _xlsxCallbacks.forEach(function(f) { f(); });
     _xlsxCallbacks = [];
   };
