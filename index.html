@@ -1343,7 +1343,7 @@
 
     filteredPeople = filtered;
 
-    countEl.textContent = '共 ' + filtered.length + ' 人' + (q ? '（搜索结果）' : '');
+    countEl.textContent = '共 ' + filtered.length + ' 人' + (raw ? '（搜索结果）' : '');
 
     if (filtered.length === 0) {
       listEl.innerHTML = '<div class="empty"><div class="icon">📋</div>还没有学生，点击上方按钮添加</div>';
