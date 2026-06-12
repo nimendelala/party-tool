@@ -1310,7 +1310,11 @@
           return (p.name || '').toLowerCase().indexOf(q) !== -1
             || (p.class || '').toLowerCase().indexOf(q) !== -1
             || (p.studentId || '').toLowerCase().indexOf(q) !== -1
-            || (p.notes || '').toLowerCase().indexOf(q) !== -1;
+            || (p.notes || '').toLowerCase().indexOf(q) !== -1
+            || (p.jjDate || '').indexOf(q) !== -1
+            || (p.fzDate || '').indexOf(q) !== -1
+            || (p.ybDate || '').indexOf(q) !== -1
+            || (p.zsDate || '').indexOf(q) !== -1;
         })
       : people.slice();
 
