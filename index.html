@@ -565,6 +565,19 @@
   .wf-article-item:active { background: #f5f5f5; }
   .wf-article-item .wf-article-icon { color: #aaa; font-size: 14px; flex-shrink: 0; }
   .wf-article-item .wf-article-title { flex: 1; }
+  .wf-article-move { display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
+  .wf-move-btn {
+    background: none;
+    border: none;
+    color: #bbb;
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 1.1;
+    transition: color 0.15s;
+  }
+  .wf-move-btn:active { color: #c0392b; }
+  .wf-article-item { align-items: center; }
   .wf-article-add {
     padding: 10px 16px 10px 40px;
     font-size: 14px;
@@ -2548,10 +2561,14 @@
       var openClass = (q || expandedWf[w.id]) ? ' open' : '';
       var arrowClass = (q || expandedWf[w.id]) ? ' open' : '';
       var articlesToShow = d.showAll ? (w.articles || []) : d.matched;
-      var articlesHtml = articlesToShow.map(function(a) {
+      var articlesHtml = articlesToShow.map(function(a, idx) {
         return '<div class="wf-article-item" data-action="viewArt" data-cat="' + w.id + '" data-art="' + a.id + '">'
           + '<span class="wf-article-icon">📄</span>'
           + '<span class="wf-article-title">' + esc(a.title || '(未命名)') + '</span>'
+          + '<span class="wf-article-move">'
+          + '<button class="wf-move-btn" data-action="moveArtUp" data-cat="' + w.id + '" data-art="' + a.id + '"' + (idx === 0 ? ' disabled style="visibility:hidden"' : '') + '>▲</button>'
+          + '<button class="wf-move-btn" data-action="moveArtDown" data-cat="' + w.id + '" data-art="' + a.id + '"' + (idx === articlesToShow.length - 1 ? ' disabled style="visibility:hidden"' : '') + '>▼</button>'
+          + '</span>'
           + '</div>';
       }).join('');
 
@@ -2816,6 +2833,25 @@
     var action = actionEl.getAttribute('data-action');
     var catId = actionEl.getAttribute('data-cat');
     var artId = actionEl.getAttribute('data-art');
+    var idx = parseInt(actionEl.getAttribute('data-idx') || '0');
+
+    if (action === 'moveArtUp' || action === 'moveArtDown') {
+      wfRequirePw(function() {
+        var cat = workflows.find(function(w) { return w.id === catId; });
+        if (!cat || !cat.articles) return;
+        var realIdx = cat.articles.findIndex(function(a) { return a.id === artId; });
+        if (realIdx === -1) return;
+        var targetIdx = action === 'moveArtUp' ? realIdx - 1 : realIdx + 1;
+        if (targetIdx < 0 || targetIdx >= cat.articles.length) return;
+        var tmp = cat.articles[realIdx];
+        cat.articles[realIdx] = cat.articles[targetIdx];
+        cat.articles[targetIdx] = tmp;
+        cat.updatedAt = new Date().toISOString();
+        engine.saveAndSync(function() { renderWorkflows(wfSearchInput.value); });
+        renderWorkflows(wfSearchInput.value);
+      });
+      return;
+    }
 
     if (action === 'toggleWf') {
       expandedWf[catId] = !expandedWf[catId];
