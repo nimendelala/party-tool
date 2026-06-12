@@ -746,6 +746,22 @@
         <option value="正式党员">正式党员</option>
       </select>
     </div>
+    <div class="form-group" id="fgJjDate" style="display:none">
+      <label>积极分子时间</label>
+      <input type="date" id="fjjDate">
+    </div>
+    <div class="form-group" id="fgFzDate" style="display:none">
+      <label>发展对象时间</label>
+      <input type="date" id="ffzDate">
+    </div>
+    <div class="form-group" id="fgYbDate" style="display:none">
+      <label>预备党员时间</label>
+      <input type="date" id="fybDate">
+    </div>
+    <div class="form-group" id="fgZsDate" style="display:none">
+      <label>正式党员时间</label>
+      <input type="date" id="fzsDate">
+    </div>
     <div class="form-group">
       <label>备注</label>
       <textarea id="fnotes" placeholder="请输入备注信息"></textarea>
@@ -765,6 +781,7 @@
     <div class="form-group" id="batchEditValueGroup" style="display:none">
       <label id="batchEditValueLabel">新值</label>
       <input type="text" id="fbatchValue" placeholder="请输入新值">
+      <input type="date" id="fbatchDate" style="display:none">
       <select id="fbatchSelect" style="display:none">
         <option value="">请选择</option>
         <option value="积极分子">积极分子</option>
@@ -805,6 +822,10 @@
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expName" checked> 姓名</label>
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expClass" checked> 班级</label>
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expStatus" checked> 当前状态</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expJjDate"> 积极分子时间</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expFzDate"> 发展对象时间</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expYbDate"> 预备党员时间</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expZsDate"> 正式党员时间</label>
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expNotes" checked> 备注</label>
     </div>
     <div class="form-actions">
@@ -1239,6 +1260,44 @@
   const fclass = document.getElementById('fclass');
   const fstudentId = document.getElementById('fstudentId');
   const fnotes = document.getElementById('fnotes');
+  const fjjDate = document.getElementById('fjjDate');
+  const ffzDate = document.getElementById('ffzDate');
+  const fybDate = document.getElementById('fybDate');
+  const fzsDate = document.getElementById('fzsDate');
+
+  var statusOrder = ['积极分子','发展对象','预备党员','正式党员'];
+
+  function updateDateFields(status, prevStatus) {
+    var idx = statusOrder.indexOf(status);
+    var showJj = idx >= 0 && status !== '';
+    var showFz = idx >= 1;
+    var showYb = idx >= 2;
+    var showZs = idx >= 3;
+
+    document.getElementById('fgJjDate').style.display = showJj ? '' : 'none';
+    document.getElementById('fgFzDate').style.display = showFz ? '' : 'none';
+    document.getElementById('fgYbDate').style.display = showYb ? '' : 'none';
+    document.getElementById('fgZsDate').style.display = showZs ? '' : 'none';
+
+    // Downgrade: clear fields that are no longer visible
+    if (prevStatus) {
+      var newIdx = statusOrder.indexOf(status);
+      var oldIdx = statusOrder.indexOf(prevStatus);
+      if (newIdx < oldIdx) {
+        if (!showFz) ffzDate.value = '';
+        if (!showYb) fybDate.value = '';
+        if (!showZs) fzsDate.value = '';
+      }
+      if (status === '') {
+        fjjDate.value = ''; ffzDate.value = '';
+        fybDate.value = ''; fzsDate.value = '';
+      }
+    }
+  }
+
+  fstudentId.addEventListener('change', function() {
+    updateDateFields(this.value);
+  });
 
   let selectionMode = false;
   let selectedIds = {};
@@ -1305,6 +1364,11 @@
     fname.value = person ? person.name : '';
     fclass.value = person ? person.class : '';
     fstudentId.value = person ? person.studentId : '';
+    fjjDate.value = person ? (person.jjDate || '') : '';
+    ffzDate.value = person ? (person.fzDate || '') : '';
+    fybDate.value = person ? (person.ybDate || '') : '';
+    fzsDate.value = person ? (person.zsDate || '') : '';
+    updateDateFields(fstudentId.value);
     fnotes.value = person ? person.notes : '';
     btnDelete.style.display = person ? '' : 'none';
     modal.classList.add('active');
@@ -1325,6 +1389,10 @@
       name: name,
       class: fclass.value.trim(),
       studentId: fstudentId.value.trim(),
+      jjDate: fjjDate.value,
+      fzDate: ffzDate.value,
+      ybDate: fybDate.value,
+      zsDate: fzsDate.value,
       notes: fnotes.value.trim(),
       updatedAt: new Date().toISOString()
     };
@@ -1401,12 +1469,20 @@
     var incName = document.getElementById('expName').checked;
     var incClass = document.getElementById('expClass').checked;
     var incStatus = document.getElementById('expStatus').checked;
+    var incJj = document.getElementById('expJjDate').checked;
+    var incFz = document.getElementById('expFzDate').checked;
+    var incYb = document.getElementById('expYbDate').checked;
+    var incZs = document.getElementById('expZsDate').checked;
     var incNotes = document.getElementById('expNotes').checked;
 
     var headers = [];
     if (incName) headers.push('姓名');
     if (incClass) headers.push('班级');
     if (incStatus) headers.push('当前状态');
+    if (incJj) headers.push('积极分子时间');
+    if (incFz) headers.push('发展对象时间');
+    if (incYb) headers.push('预备党员时间');
+    if (incZs) headers.push('正式党员时间');
     if (incNotes) headers.push('备注');
     if (headers.length === 0) { alert('请至少选择一个字段'); return; }
 
@@ -1417,6 +1493,10 @@
         if (incName) row.push(p.name);
         if (incClass) row.push(p.class);
         if (incStatus) row.push(p.studentId);
+        if (incJj) row.push(p.jjDate || '');
+        if (incFz) row.push(p.fzDate || '');
+        if (incYb) row.push(p.ybDate || '');
+        if (incZs) row.push(p.zsDate || '');
         if (incNotes) row.push(p.notes);
         rows.push(row);
       });
@@ -1726,6 +1806,7 @@
   var batchEditValueLabel = document.getElementById('batchEditValueLabel');
   var fbatchValue = document.getElementById('fbatchValue');
   var fbatchSelect = document.getElementById('fbatchSelect');
+  var fbatchDate = document.getElementById('fbatchDate');
   var btnBatchEditCancel = document.getElementById('btnBatchEditCancel');
   var btnBatchEditApply = document.getElementById('btnBatchEditApply');
   var batchEditField = null;
@@ -1733,7 +1814,11 @@
   var batchEditFields = [
     { key: 'studentId', label: '当前状态' },
     { key: 'class', label: '班级' },
-    { key: 'notes', label: '备注' }
+    { key: 'notes', label: '备注' },
+    { key: 'jjDate', label: '积极分子时间' },
+    { key: 'fzDate', label: '发展对象时间' },
+    { key: 'ybDate', label: '预备党员时间' },
+    { key: 'zsDate', label: '正式党员时间' }
   ];
 
   function openBatchEditModal() {
@@ -1760,14 +1845,20 @@
     batchEditValueGroup.style.display = '';
     btnBatchEditApply.style.display = '';
 
-    // Toggle between text input and select dropdown
+    // Toggle between text input, date, and select
+    var isDate = key === 'jjDate' || key === 'fzDate' || key === 'ybDate' || key === 'zsDate';
+    fbatchValue.style.display = 'none';
+    fbatchSelect.style.display = 'none';
+    fbatchDate.style.display = 'none';
     if (key === 'studentId') {
-      fbatchValue.style.display = 'none';
       fbatchSelect.style.display = '';
       fbatchSelect.focus();
+    } else if (isDate) {
+      fbatchDate.style.display = '';
+      fbatchDate.value = '';
+      fbatchDate.focus();
     } else {
       fbatchValue.style.display = '';
-      fbatchSelect.style.display = 'none';
       fbatchValue.focus();
     }
 
@@ -1785,7 +1876,8 @@
 
   function applyBatchEdit() {
     if (!batchEditField) { alert('请先选择要修改的字段'); return; }
-    var newValue = (batchEditField === 'studentId' ? fbatchSelect.value : fbatchValue.value.trim());
+    var isDate = batchEditField === 'jjDate' || batchEditField === 'fzDate' || batchEditField === 'ybDate' || batchEditField === 'zsDate';
+    var newValue = batchEditField === 'studentId' ? fbatchSelect.value : (isDate ? fbatchDate.value : fbatchValue.value.trim());
     var ids = Object.keys(selectedIds);
     if (ids.length === 0) return;
 
