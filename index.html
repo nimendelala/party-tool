@@ -1304,19 +1304,34 @@
   let filteredPeople = [];
 
   function render(filter) {
-    const q = (filter || '').toLowerCase().trim();
-    const filtered = q
-      ? people.filter(function(p) {
-          return (p.name || '').toLowerCase().indexOf(q) !== -1
-            || (p.class || '').toLowerCase().indexOf(q) !== -1
-            || (p.studentId || '').toLowerCase().indexOf(q) !== -1
-            || (p.notes || '').toLowerCase().indexOf(q) !== -1
-            || (p.jjDate || '').indexOf(q) !== -1
-            || (p.fzDate || '').indexOf(q) !== -1
-            || (p.ybDate || '').indexOf(q) !== -1
-            || (p.zsDate || '').indexOf(q) !== -1;
-        })
-      : people.slice();
+    var raw = (filter || '').trim();
+    var keywords = raw ? raw.split(/[,\s\n\r]+/) : [];
+    var multiKeyword = keywords.length > 1;
+
+    var filtered;
+    if (keywords.length > 0) {
+      var lowerKeys = keywords.map(function(k) { return k.toLowerCase(); });
+      filtered = people.filter(function(p) {
+        if (multiKeyword) {
+          // Multiple keywords: match by name only, any keyword
+          return lowerKeys.some(function(k) {
+            return (p.name || '').toLowerCase().indexOf(k) !== -1;
+          });
+        }
+        // Single keyword: search all fields
+        var k = lowerKeys[0];
+        return (p.name || '').toLowerCase().indexOf(k) !== -1
+          || (p.class || '').toLowerCase().indexOf(k) !== -1
+          || (p.studentId || '').toLowerCase().indexOf(k) !== -1
+          || (p.notes || '').toLowerCase().indexOf(k) !== -1
+          || (p.jjDate || '').indexOf(k) !== -1
+          || (p.fzDate || '').indexOf(k) !== -1
+          || (p.ybDate || '').indexOf(k) !== -1
+          || (p.zsDate || '').indexOf(k) !== -1;
+      });
+    } else {
+      filtered = people.slice();
+    }
 
     // Sort by class, then by name
     filtered.sort(function(a, b) {
