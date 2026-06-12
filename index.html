@@ -87,6 +87,58 @@
     border-color: #c0392b;
   }
 
+  /* Custom tags bar */
+  .custom-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    align-items: center;
+  }
+  .custom-tab {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+    color: #888;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .custom-tab:active { background: #f0f0f0; }
+  .custom-tab.active {
+    background: #2980b9;
+    color: #fff;
+    border-color: #2980b9;
+  }
+  .custom-tab-del {
+    margin-left: 2px;
+    font-size: 15px;
+    line-height: 1;
+    vertical-align: -1px;
+    opacity: 0.6;
+  }
+  .custom-tab.active .custom-tab-del { opacity: 0.9; }
+  .custom-tab-add {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border: 1px dashed #ccc;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: #aaa;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .custom-tab-add:active { background: #f0f0f0; color: #888; }
+  .batch-bar .btn-tag-batch { background: #2980b9; color: #fff; }
+
   /* Add button */
   .add-btn {
     display: block;
@@ -702,6 +754,7 @@
       <button class="status-tab" data-status="正式党员">正式党员</button>
       <button class="status-tab" data-status="已毕业">已毕业</button>
     </div>
+    <div class="custom-tabs" id="customTabs"></div>
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="搜索...">
     </div>
@@ -718,6 +771,7 @@
       <button class="btn-select-all" id="btnSelectReverse" style="border-color:#c0392b;color:#c0392b;">反选</button>
       <button class="btn-edit-batch" id="btnEditBatch">批量修改</button>
       <button class="btn-delete-batch" id="btnDeleteBatch">删除</button>
+      <button class="btn-tag-batch" id="btnTagBatch">打标签</button>
       <button class="btn-cancel-batch" id="btnCancelBatch">取消</button>
     </div>
     <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls" style="display:none">
@@ -803,6 +857,10 @@
       <label>备注</label>
       <textarea id="fnotes" placeholder="请输入备注信息"></textarea>
     </div>
+    <div class="form-group">
+      <label>自定义标签（逗号分隔）</label>
+      <input type="text" id="ftags" placeholder="如：材料未交,需补照片">
+    </div>
     <div class="form-actions">
       <button class="btn-cancel" id="btnCancel">取消</button>
       <button class="btn-delete" id="btnDelete" style="display:none">删除</button>
@@ -864,6 +922,7 @@
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expFzDate"> 发展对象时间</label>
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expYbDate"> 预备党员时间</label>
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expZsDate"> 正式党员时间</label>
+      <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expTags"> 自定义标签</label>
       <label style="display:block;margin-bottom:8px"><input type="checkbox" id="expNotes" checked> 备注</label>
     </div>
     <div class="form-actions">
@@ -1298,6 +1357,7 @@
   const fclass = document.getElementById('fclass');
   const fstudentId = document.getElementById('fstudentId');
   const fnotes = document.getElementById('fnotes');
+  const ftags = document.getElementById('ftags');
   const fjjDate = document.getElementById('fjjDate');
   const ffzDate = document.getElementById('ffzDate');
   const fybDate = document.getElementById('fybDate');
@@ -1337,6 +1397,92 @@
     updateDateFields(this.value);
   });
 
+  // Custom tags
+  var currentCustomTab = '';
+
+  function renderCustomTabs() {
+    var tagSet = {};
+    people.forEach(function(p) {
+      (p.tags || []).forEach(function(t) {
+        if (t) tagSet[t] = (tagSet[t] || 0) + 1;
+      });
+    });
+    var tags = Object.keys(tagSet).sort();
+    if (tags.length === 0 && !currentCustomTab) {
+      document.getElementById('customTabs').innerHTML = '';
+      return;
+    }
+    var html = '<button class="custom-tab'
+      + (currentCustomTab === '' ? ' active' : '')
+      + '" data-tag="">全部</button>';
+    tags.forEach(function(t) {
+      html += '<button class="custom-tab'
+        + (currentCustomTab === t ? ' active' : '')
+        + '" data-tag="' + esc(t) + '">'
+        + esc(t) + ' <span class="custom-tab-del">×</span></button>';
+    });
+    html += '<button class="custom-tab-add" id="customTabAdd">+ 添加</button>';
+    document.getElementById('customTabs').innerHTML = html;
+
+    document.getElementById('customTabAdd').addEventListener('click', function() {
+      var name = prompt('请输入标签名称：');
+      if (!name || !name.trim()) return;
+      name = name.trim();
+      var ids = Object.keys(selectedIds);
+      if (ids.length === 0) { alert('请先在学生列表中选择学生'); return; }
+      people.forEach(function(p) {
+        if (selectedIds[p.id]) {
+          if (!p.tags) p.tags = [];
+          if (p.tags.indexOf(name) === -1) p.tags.push(name);
+          p.updatedAt = new Date().toISOString();
+        }
+      });
+      currentCustomTab = name;
+      engine.saveAndSync(function() { render(searchInput.value); });
+      render(searchInput.value);
+    });
+  }
+
+  document.getElementById('customTabs').addEventListener('click', function(e) {
+    var tab = e.target.closest('.custom-tab');
+    if (!tab) return;
+    if (e.target.classList.contains('custom-tab-del')) {
+      if (!confirm('确定删除标签「' + tab.getAttribute('data-tag') + '」？将从所有学生身上移除此标签。')) return;
+      var tag = tab.getAttribute('data-tag');
+      people.forEach(function(p) {
+        if (p.tags) {
+          p.tags = p.tags.filter(function(t) { return t !== tag; });
+          p.updatedAt = new Date().toISOString();
+        }
+      });
+      if (currentCustomTab === tag) currentCustomTab = '';
+      engine.saveAndSync(function() { render(searchInput.value); });
+      render(searchInput.value);
+      return;
+    }
+    currentCustomTab = tab.getAttribute('data-tag') || '';
+    render(searchInput.value);
+  });
+
+  // Batch tag button
+  document.getElementById('btnTagBatch').addEventListener('click', function() {
+    var ids = Object.keys(selectedIds);
+    if (ids.length === 0) { alert('请先选择学生'); return; }
+    var name = prompt('请输入标签名称：');
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    people.forEach(function(p) {
+      if (selectedIds[p.id]) {
+        if (!p.tags) p.tags = [];
+        if (p.tags.indexOf(name) === -1) p.tags.push(name);
+        p.updatedAt = new Date().toISOString();
+      }
+    });
+    currentCustomTab = name;
+    engine.saveAndSync(function() { render(searchInput.value); });
+    render(searchInput.value);
+  });
+
   let selectionMode = false;
   let selectedIds = {};
   let filteredPeople = [];
@@ -1348,6 +1494,13 @@
     var pool = currentTab
       ? people.filter(function(p) { return p.studentId === currentTab; })
       : people;
+
+    // Custom tag filter
+    if (currentCustomTab) {
+      pool = pool.filter(function(p) {
+        return (p.tags || []).indexOf(currentCustomTab) !== -1;
+      });
+    }
 
     // Field-specific search: jj:, fz:, yb:, zs:, or Chinese prefixes
     var prefixMap = {
@@ -1391,6 +1544,7 @@
           || (p.class || '').toLowerCase().indexOf(k) !== -1
           || (p.studentId || '').toLowerCase().indexOf(k) !== -1
           || (p.notes || '').toLowerCase().indexOf(k) !== -1
+          || (p.tags || []).join(',').toLowerCase().indexOf(k) !== -1
           || (p.jjDate || '').indexOf(k) !== -1
           || (p.fzDate || '').indexOf(k) !== -1
           || (p.ybDate || '').indexOf(k) !== -1
@@ -1434,6 +1588,7 @@
     }).join('');
     updateBatchUI();
     lastStudentsJSON = JSON.stringify(people);
+    renderCustomTabs();
   }
 
   function esc(s) {
@@ -1456,6 +1611,7 @@
     fzsDate.value = person ? (person.zsDate || '') : '';
     updateDateFields(fstudentId.value);
     fnotes.value = person ? person.notes : '';
+    ftags.value = person ? ((person.tags || []).join(', ')) : '';
     btnDelete.style.display = person ? '' : 'none';
     modal.classList.add('active');
     fname.focus();
@@ -1479,6 +1635,7 @@
       fzDate: ffzDate.value,
       ybDate: fybDate.value,
       zsDate: fzsDate.value,
+      tags: ftags.value ? ftags.value.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean) : [],
       notes: fnotes.value.trim(),
       updatedAt: new Date().toISOString()
     };
@@ -1571,6 +1728,7 @@
     var incYb = document.getElementById('expYbDate').checked;
     var incZs = document.getElementById('expZsDate').checked;
     var incNotes = document.getElementById('expNotes').checked;
+    var incTags = document.getElementById('expTags').checked;
 
     var headers = [];
     if (incName) headers.push('姓名');
@@ -1580,6 +1738,7 @@
     if (incFz) headers.push('发展对象时间');
     if (incYb) headers.push('预备党员时间');
     if (incZs) headers.push('正式党员时间');
+    if (incTags) headers.push('自定义标签');
     if (incNotes) headers.push('备注');
     if (headers.length === 0) { alert('请至少选择一个字段'); return; }
 
@@ -1594,6 +1753,7 @@
         if (incFz) row.push(p.fzDate || '');
         if (incYb) row.push(p.ybDate || '');
         if (incZs) row.push(p.zsDate || '');
+        if (incTags) row.push((p.tags || []).join(', '));
         if (incNotes) row.push(p.notes);
         rows.push(row);
       });
