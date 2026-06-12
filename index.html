@@ -59,6 +59,34 @@
   }
   .search-bar input:focus { border-color: #c0392b; }
 
+  /* Status tabs */
+  .status-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .status-tab {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+    color: #888;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .status-tab:active { background: #f0f0f0; }
+  .status-tab.active {
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+  }
+
   /* Add button */
   .add-btn {
     display: block;
@@ -666,6 +694,13 @@
   <!-- ====== Students View ====== -->
   <div id="view-students" class="view">
     <button class="back-btn" id="backFromStudents">← 返回首页</button>
+    <div class="status-tabs" id="statusTabs">
+      <button class="status-tab active" data-status="">全部</button>
+      <button class="status-tab" data-status="积极分子">积极分子</button>
+      <button class="status-tab" data-status="发展对象">发展对象</button>
+      <button class="status-tab" data-status="预备党员">预备党员</button>
+      <button class="status-tab" data-status="正式党员">正式党员</button>
+    </div>
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="搜索...">
     </div>
@@ -1306,6 +1341,11 @@
   function render(filter) {
     var raw = (filter || '').trim();
 
+    // Status tab filter
+    var pool = currentTab
+      ? people.filter(function(p) { return p.studentId === currentTab; })
+      : people;
+
     // Field-specific search: jj:, fz:, yb:, zs:, or Chinese prefixes
     var prefixMap = {
       'jj':'jjDate','积极分子':'jjDate',
@@ -1326,7 +1366,7 @@
     var filtered;
     if (fieldKey) {
       // Prefix mode: search only the specified date field
-      filtered = people.filter(function(p) {
+      filtered = pool.filter(function(p) {
         var val = (p[fieldKey] || '');
         if (searchTerm === '') return val !== '';
         return val.toLowerCase().indexOf(searchTerm) !== -1;
@@ -1335,7 +1375,7 @@
       var keywords = raw.split(/[,\s\n\r]+/);
       var multiKeyword = keywords.length > 1;
       var lowerKeys = keywords.map(function(k) { return k.toLowerCase(); });
-      filtered = people.filter(function(p) {
+      filtered = pool.filter(function(p) {
         if (multiKeyword) {
           // Multiple keywords: match by name only, any keyword
           return lowerKeys.some(function(k) {
@@ -1354,7 +1394,7 @@
           || (p.zsDate || '').indexOf(k) !== -1;
       });
     } else {
-      filtered = people.slice();
+      filtered = pool.slice();
     }
 
     // Sort by class, then by name
@@ -1472,6 +1512,17 @@
   });
   searchInput.addEventListener('input', function() {
     render(this.value);
+  });
+
+  // Status tabs
+  var currentTab = '';
+  document.getElementById('statusTabs').addEventListener('click', function(e) {
+    var tab = e.target.closest('.status-tab');
+    if (!tab) return;
+    currentTab = tab.getAttribute('data-status');
+    document.querySelectorAll('.status-tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    render(searchInput.value);
   });
 
   function downloadBlob(blob, filename) {
