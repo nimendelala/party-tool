@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>体育系党支部工具箱</title>
-<link rel="manifest" href="/manifest.json">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -3000,9 +2999,11 @@
   }
 })();
 </script>
-<script>
+<script>// Unregister old PWA service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js');
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(r) { r.unregister(); });
+  });
 }
 </script>
 <script>// Lazy-load XLSX only when needed (fast initial load)
